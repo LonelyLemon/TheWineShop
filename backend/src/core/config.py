@@ -1,5 +1,6 @@
-from pydantic import PostgresDsn
+from pydantic import PostgresDsn, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_core import MultiHostUrl
 
 from src.core.constants import Environment
 
@@ -11,10 +12,16 @@ class CustomBaseSettings(BaseSettings):
 
 class Settings(CustomBaseSettings):
     # Database
-    DATABASE_URL: PostgresDsn
     DATABASE_POOL_SIZE: int = 16
     DATABASE_POOL_TTL: int = 60 * 20  # 20 minutes
     DATABASE_POOL_PRE_PING: bool = True
+
+    POSTGRES_DB: str
+    POSTGRES_PASSWORD: str
+    POSTGRES_HOST: str
+    POSTGRES_USER: str
+    POSTGRES_PORT: int
+    SQLALCHEMY_DATABASE_URL: str
 
     # Redis
     REDIS_URL: str
@@ -41,4 +48,16 @@ class Settings(CustomBaseSettings):
     MAIL_HOST: str
     MAIL_FROM_NAME: str
     
+    @computed_field
+    @property
+    def ASYNC_DATABASE_URI(self) -> PostgresDsn:
+        return MultiHostUrl.build(
+            scheme="postgresql+asyncpg",
+            username=self.POSTGRES_USER,
+            password=self.POSTGRES_PASSWORD,
+            host=self.POSTGRES_HOST,
+            port=self.POSTGRES_PORT,
+            path=self.POSTGRES_DB,
+        )
+
 settings = Settings() 

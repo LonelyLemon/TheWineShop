@@ -12,8 +12,11 @@ dependencies = [
     "botocore>=1.40.68",
     "fastapi>=0.121.0",
     "fastapi-mail>=1.5.8",
+    "jose>=1.0.0",
     "jwt>=1.4.0",
     "loguru>=0.7.3",
+    "passlib[bcrypt]>=1.7.4",
     "pydantic-settings>=2.11.0",
+    "python-jose[cryptography]>=3.5.0",
     "sqlalchemy>=2.0.44",
 ]
