@@ -1,16 +1,24 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi_mail import MessageSchema, MessageType
 from sqlalchemy.future import select
 
 from src.core.database import SessionDep
 from src.core.security import hash_password
+from src.core.config import settings
+from src.core.email_service import email_service_basic
+from src.auth.security import create_verify_token, decode_token, generate_reset_otp
+from src.auth.exceptions import InvalidToken
+from src.auth.dependencies import get_current_user
 from src.user.models import User
 from src.user.schemas import (
     UserCreate, 
-    UserResponse, 
-    UserUpdate
+    UserResponse,
+    UserUpdate,
+    ForgetPasswordRequest
 )
 from src.user.exceptions import (
-    UserEmailExist
+    UserEmailExist,
+    UserNotFound
 )
 
 
@@ -25,7 +33,9 @@ user_route = APIRouter(
 
 @user_route.post('/register', response_model=UserResponse)
 async def register(user: UserCreate, 
-                   db: SessionDep):
+                   db: SessionDep,
+                   background_tasks: BackgroundTasks):
+    # Create new User
     email_norm = user.email.strip().lower()
     result = await db.execute(select(User).where(User.email == email_norm))
     existed_user = result.scalar_one_or_none()
@@ -39,22 +49,130 @@ async def register(user: UserCreate,
         middle_name = user.middle_name,
         email = email_norm,
         hashed_password = hashed_password,
-        city = user.city
+        city = user.city,
+        email_verified = False
     )
+
     db.add(new_user)
     await db.commit()
     await db.refresh(new_user)
 
+    # Send Verification Email
+    verify_token = create_verify_token(email_norm)
+    verify_link = f"{settings.FRONTEND_URL}/verify-email?token={verify_token}"
+
+    html_content = f"""
+    <h1>Chào mừng {new_user.last_name} đến với TheWineShop!</h1>
+    <p>Vui lòng click vào đường dẫn sau để xác thực tài khoản:</p>
+    <a href="{verify_link}">Xác thực ngay</a>
+    <p>Link này sẽ hết hạn sau 24 giờ.</p>
+    """
+
+    message = MessageSchema(
+        subject="TheWineShop - Xác thực tài khoản đăng ký",
+        recipients=[new_user.email],
+        body=html_content,
+        subtype=MessageType.html,
+    )
+    
+    background_tasks.add_task(email_service_basic.send_mail, message)
+
     return new_user
+
+#-------------------------------
+#      VERIFY EMAIL ROUTE
+#-------------------------------
+
+@user_route.get('/verify-email')
+async def verify_email(token: str,
+                       db: SessionDep):
+    try:
+        payload = decode_token(token)
+
+        if payload.get("type") != "verification":
+            raise InvalidToken()
+        email = payload.get("sub")
+        if not email:
+            raise InvalidToken()
+
+        result = await db.execute(select(User).where(User.email == email))
+        user = result.scalar_one_or_none()
+        if not user:
+            raise UserNotFound()
+        if user.email_verified:
+            return {
+                "message": "Your account have already been verified."
+            }
+
+        user.email_verified = True
+        db.add(user)
+        await db.commit()
+
+        return {
+            "message": "Your email is verified successfully !"
+        }
+
+    except Exception:
+        raise InvalidToken()
 
 #-------------------------------
 #        GET USER INFO
 #-------------------------------
 
+@user_route.get('/me')
+async def get_user_info(current_user: UserResponse = Depends(get_current_user)):
+    return current_user
+
 #-------------------------------
 #        UPDATE USER
 #-------------------------------
 
+@user_route.post('/update-user')
+async def update_user(db: SessionDep, 
+                      update_request: UserUpdate, 
+                      current_user: UserResponse = Depends(get_current_user)):
+    result = await db.execute(select(User).where(User.id == current_user.id))
+    user = result.scalar_one_or_none()
+    update_data = update_request.model_dump(exclude_unset=True)
+
+    if "password" in update_data:
+        update_data["hashed_password"] = hash_password(update_data.pop("password"))
+    for key, value in update_data.items():
+        setattr(user, key, value)
+
+    await db.commit()
+    await db.refresh(user)
+    return user
+
 #-------------------------------
 #       FORGET PASSWORD
 #-------------------------------
+
+@user_route.post('/forget-password')
+async def forget_password(db: SessionDep,
+                          payload: ForgetPasswordRequest,
+                          background_tasks: BackgroundTasks):
+    result = await db.execute(select(User).where(User.email == payload.email))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise UserNotFound()
+    
+    reset_token = generate_reset_otp()
+    reset_link = f"{settings.FRONTEND_URL}/forget-password?token={reset_token}"
+
+    html_content = f"""
+    <h1>Chào mừng {user.last_name} đến với TheWineShop!</h1>
+    <p>Vui lòng click vào đường dẫn sau để đặt lại mật khẩu:</p>
+    <a href="{reset_link}">Đổi mật khẩu</a>
+    <p>Link này sẽ hết hạn sau 24 giờ.</p>
+    """
+
+    message = MessageSchema(
+        subject="TheWineShop - Quên mật khẩu",
+        recipients=[user.email],
+        body=html_content,
+        subtype=MessageType.html,
+    )
+    
+    background_tasks.add_task(email_service_basic.send_mail, message)

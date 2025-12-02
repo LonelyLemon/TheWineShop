@@ -35,8 +35,19 @@ def decode_token(token: str) -> dict:
         return payload
     except JWTError:
         raise NotAuthenticated()
-    
+
+
+def create_verify_token(email: str) -> str:
+    expire=datetime.now(timezone.utc) + timedelta(hours=settings.VERIFY_TOKEN_EXPIRES)
+    to_encode = {
+        "sub": email,
+        "exp": expire,
+        "type": "verification"
+    }
+    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.SECURITY_ALGORITHM)
+    return encoded_jwt
+
 
 def generate_reset_otp() -> str:
-    """Tạo OTP 6 số cho password reset"""
+    # Generate a 6-digits OTP for password reset
     return f"{secrets.randbelow(1000000):06d}"

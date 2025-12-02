@@ -1,4 +1,4 @@
-from pydantic import PostgresDsn, computed_field
+from pydantic import EmailStr, PostgresDsn, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic_core import MultiHostUrl
 
@@ -39,11 +39,12 @@ class Settings(CustomBaseSettings):
     SECURITY_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 360
     REFRESH_TOKEN_EXPIRES: int = 30 # Days
+    VERIFY_TOKEN_EXPIRES: int = 24 # Hours
     
     # Email
     MAIL_USER: str
     MAIL_PASSWORD: str
-    MAIL_FROM: str
+    MAIL_FROM: EmailStr
     MAIL_PORT: str
     MAIL_HOST: str
     MAIL_FROM_NAME: str

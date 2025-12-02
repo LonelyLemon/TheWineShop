@@ -9,6 +9,8 @@ from starlette.middleware.cors import CORSMiddleware
 
 from src.core.config import settings
 from src.routers import api_router
+from src.auth.router import auth_route
+from src.user.router import user_route
 
 THIS_DIR = Path(__file__).parent
 
@@ -42,3 +44,5 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 
 app.include_router(api_router)
+app.include_router(auth_route)
+app.include_router(user_route)

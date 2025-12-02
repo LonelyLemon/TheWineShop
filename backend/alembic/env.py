@@ -9,7 +9,7 @@ from src.core.base_model import Base
 from src.models import * #noqa: F403
 from src.core.config import settings
 
-SQLALCHEMY_DATABASE_URI = str(settings.DATABASE_URL)
+SQLALCHEMY_DATABASE_URI = str(settings.SQLALCHEMY_DATABASE_URL)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

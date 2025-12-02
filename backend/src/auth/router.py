@@ -12,7 +12,7 @@ from src.auth.security import (
     decode_token
 )
 from src.auth.exceptions import (
-    InvalidToken, 
+    InvalidToken,
     InvalidPassword
 )
 from src.user.exceptions import UserNotFound
@@ -26,7 +26,7 @@ auth_route = APIRouter(
 
 #-------------------------------
 #         LOGIN ROUTE
-#-------------------------------
+#-------------------------------w
 
 @auth_route.post('/login')
 async def login(db: SessionDep, 
