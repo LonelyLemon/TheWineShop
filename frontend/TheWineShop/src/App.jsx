@@ -11,6 +11,8 @@ import HomePage from './pages/HomePage';
 import ProductDetailPage from './pages/ProductDetailPage';
 import MainLayout from './layouts/MainLayout';
 import CartPage from './pages/CartPage';
+import CheckoutPage from './pages/CheckoutPage';
+import OrdersPage from './pages/OrdersPage';
 import './App.css';
 
 function App() {
@@ -27,6 +29,8 @@ function App() {
            <Route path="/" element={<HomePage />} />
            <Route path="/products/:id" element={<ProductDetailPage />} />
            <Route path="/cart" element={<CartPage />} />
+           <Route path="/checkout" element={<CheckoutPage />} />
+           <Route path="/orders" element={<OrdersPage />} />
         </Route>
       </Routes>
     </>

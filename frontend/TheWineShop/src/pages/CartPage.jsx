@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
 import { toast } from 'react-toastify';
 import './CartPage.css';
 
 const CartPage = () => {
+  const navigate = useNavigate();
   const [cart, setCart] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -110,7 +111,12 @@ const CartPage = () => {
             <span>{formatPrice(cart.total_price)}</span>
           </div>
           
-          <button className="checkout-btn">Tiến hành thanh toán</button>
+          <button 
+            className="checkout-btn"
+            onClick={() => navigate('/checkout')}
+          >
+            Tiến hành thanh toán
+          </button>
         </div>
       </div>
     </div>
