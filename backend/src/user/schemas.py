@@ -1,45 +1,42 @@
-import uuid
-import datetime
-
+from uuid import UUID
 from typing import Optional
-from pydantic import BaseModel, EmailStr
+from datetime import datetime
+from pydantic import BaseModel, EmailStr, Field
 
-from src.user.constants import UserRole, UserStatus
+
+class UserBase(BaseModel):
+    email: EmailStr
 
 
-class UserCreate(BaseModel):
+class UserCreate(UserBase):
+    password: str
     first_name: str
     last_name: str
-    middle_name: str
-    email: EmailStr
-    password: str
-    city: str
+    middle_name: Optional[str] = None
+    city: Optional[str] = None
 
 
 class UserUpdate(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     middle_name: Optional[str] = None
+    city: Optional[str] = None
     password: Optional[str] = None
-    avatar_url: Optional[str | None] = None
     phone_number: Optional[str] = None
     address: Optional[str] = None
-    birthdate: Optional[datetime.datetime] = None
+    birthdate: Optional[datetime] = None
 
 
-class UserResponse(BaseModel):
-    id: uuid.UUID
+class UserResponse(UserBase):
+    id: UUID
     first_name: str
     last_name: str
-    middle_name: str
-    email: EmailStr
-    role: str
-    avatar_url: str | None
-    phone_number: str
-    address: str
-    city: str
-    birthdate: datetime.datetime
-    status: str
+    middle_name: Optional[str] = None
+    city: Optional[str] = None
+    email_verified: bool
+    phone_number: Optional[str] = None
+    address: Optional[str] = None
+    birthdate: Optional[datetime] = None
     
 
     class Config:

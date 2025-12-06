@@ -18,23 +18,14 @@ conf = ConnectionConfig(
 
 
 class EmailService:
-    def __init__(self, config: ConnectionConfig):
-        self.config = config
-        self._instance: FastMail = FastMail(self.config)
-        self.RETRY_NUM = 2
-
     async def send_mail(self, message: MessageSchema):
-        _c = self.RETRY_NUM
-        while _c > 0:
-            try:
-                await self._instance.send_message(message=message)
-                return
-            except Exception as e:
-                _c -= 1
-                logger.error(str(e))
-        logger.exception(
-            f"Error mail service. Cannot send email to {','.join(message.recipients)}"
-        )
+        try:
+            fm = FastMail(conf)
+            await fm.send_message(message)
+            logger.info("Email sent successfully")
+        except Exception as e:
+            recipients_str = ', '.join([str(r) for r in message.recipients])
+            logger.error(f"Error mail service. Cannot send email to {recipients_str}")
+            logger.error(f"Exception detail: {e}")
 
-
-email_service_basic = EmailService(config=conf)
+email_service_basic = EmailService()

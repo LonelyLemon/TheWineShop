@@ -13,7 +13,8 @@ from src.auth.security import (
 )
 from src.auth.exceptions import (
     InvalidToken,
-    InvalidPassword
+    InvalidPassword,
+    UserNotVerified
 )
 from src.user.exceptions import UserNotFound
 from src.user.models import User
@@ -39,7 +40,9 @@ async def login(db: SessionDep,
         raise UserNotFound()
     if not verify_password(login_request.password, user.hashed_password):
         raise InvalidPassword()
-
+    if not user.email_verified:
+        raise UserNotVerified()
+    
     access_token = create_access_token(data={"sub": user.email})
     refresh_token = create_refresh_token(data={"sub": user.email})
 

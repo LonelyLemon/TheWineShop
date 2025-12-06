@@ -1,0 +1,106 @@
+.navbar {
+    background-color: white;
+    height: 70px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1rem;
+    position: sticky;
+    top: 0;
+    z-index: 999;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+.navbar-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    max-width: 1200px;
+    padding: 0 20px;
+}
+
+.navbar-logo {
+    color: #800020;
+    font-size: 1.5rem;
+    font-weight: bold;
+    text-decoration: none;
+}
+
+.nav-menu {
+    display: flex;
+    list-style: none;
+    gap: 20px;
+}
+
+.nav-links {
+    color: #333;
+    text-decoration: none;
+    font-weight: 500;
+}
+.nav-links:hover { color: #800020; }
+
+.nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.cart-icon {
+    text-decoration: none;
+    font-size: 1.5rem;
+    position: relative;
+    margin-right: 10px;
+}
+
+.cart-count {
+    position: absolute;
+    top: -5px;
+    right: -10px;
+    background: #800020;
+    color: white;
+    font-size: 0.7rem;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.auth-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+.nav-btn-login, .nav-btn-register {
+    text-decoration: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.nav-btn-login {
+    color: #800020;
+    border: 1px solid #800020;
+}
+
+.nav-btn-register {
+    background-color: #800020;
+    color: white;
+}
+
+.user-name {
+    margin-right: 10px;
+    font-weight: bold;
+    color: #333;
+}
+
+.logout-btn {
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    text-decoration: underline;
+}
+.logout-btn:hover { color: red; }

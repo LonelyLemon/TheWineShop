@@ -1,6 +1,7 @@
 from fastapi import APIRouter, BackgroundTasks, Depends
 from fastapi_mail import MessageSchema, MessageType
 from sqlalchemy.future import select
+from loguru import logger
 
 from src.core.database import SessionDep
 from src.core.security import hash_password
@@ -60,6 +61,10 @@ async def register(user: UserCreate,
     # Send Verification Email
     verify_token = create_verify_token(email_norm)
     verify_link = f"{settings.FRONTEND_URL}/verify-email?token={verify_token}"
+
+    logger.info(f"--- DEV MODE VERIFICATION LINK ---")
+    logger.info(f"Click here to verify: {verify_link}")
+    logger.info(f"----------------------------------")
 
     html_content = f"""
     <h1>Chào mừng {new_user.last_name} đến với TheWineShop!</h1>
@@ -160,6 +165,10 @@ async def forget_password(db: SessionDep,
     
     reset_token = generate_reset_otp()
     reset_link = f"{settings.FRONTEND_URL}/forget-password?token={reset_token}"
+
+    logger.info(f"--- DEV MODE RESET PASSWORD LINK ---")
+    logger.info(f"Link: {reset_link}")
+    logger.info(f"------------------------------------")
 
     html_content = f"""
     <h1>Chào mừng {user.last_name} đến với TheWineShop!</h1>
