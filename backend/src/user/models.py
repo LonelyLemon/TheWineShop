@@ -15,7 +15,7 @@ class User(Base):
     middle_name: Mapped[str] = mapped_column(String(50), nullable=False)
     email: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    hashed_password: Mapped[str] = mapped_column(String(50), nullable=False)
+    hashed_password: Mapped[str] = mapped_column(String(512), nullable=False)
     role: Mapped[str] = mapped_column(String(50), nullable=False, default=UserRole.CUSTOMER.value)
     avatar_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     phone_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=True)
