@@ -8,3 +8,10 @@ from src.product.models import (
     Promotion,
     ProductReview
 )
+
+from src.order.models import (
+    Cart, 
+    CartItem, 
+    Order, 
+    OrderItem
+)

@@ -13,6 +13,7 @@ from src.routers import api_router
 from src.auth.router import auth_route
 from src.user.router import user_route
 from src.product.router import product_router
+from src.order.router import cart_router
 
 THIS_DIR = Path(__file__).parent
 
@@ -52,3 +53,4 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 app.include_router(auth_route, prefix="/api")
 app.include_router(user_route, prefix="/api")
 app.include_router(product_router, prefix="/api")
+app.include_router(cart_router, prefix="/api")
