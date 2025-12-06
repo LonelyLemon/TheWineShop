@@ -10,6 +10,7 @@ import VerifyEmailPage from './pages/VerifyEmailPage';
 import HomePage from './pages/HomePage';
 import ProductDetailPage from './pages/ProductDetailPage';
 import MainLayout from './layouts/MainLayout';
+import CartPage from './pages/CartPage';
 import './App.css';
 
 function App() {
@@ -25,6 +26,7 @@ function App() {
         <Route element={<MainLayout />}>
            <Route path="/" element={<HomePage />} />
            <Route path="/products/:id" element={<ProductDetailPage />} />
+           <Route path="/cart" element={<CartPage />} />
         </Route>
       </Routes>
     </>

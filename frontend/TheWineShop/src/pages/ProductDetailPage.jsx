@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
 import { toast } from 'react-toastify';
 import './ProductDetailPage.css';
 
 const ProductDetailPage = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
 
   useEffect(() => {
     const fetchDetail = async () => {
@@ -23,6 +25,29 @@ const ProductDetailPage = () => {
     };
     fetchDetail();
   }, [id]);
+
+  const handleAddToCart = async () => {
+    if (!localStorage.getItem('access_token')) {
+        toast.info("Vui lòng đăng nhập để mua hàng");
+        navigate('/login');
+        return;
+    }
+
+    setAdding(true);
+    try {
+        await axiosClient.post('/api/cart/items', {
+            wine_id: product.id,
+            quantity: 1
+        });
+        toast.success("Đã thêm vào giỏ hàng!");
+        
+    } catch (error) {
+        console.error(error);
+        toast.error("Có lỗi xảy ra khi thêm vào giỏ");
+    } finally {
+        setAdding(false);
+    }
+  };
 
   if (loading) return <div className="loading-container">Đang tải...</div>;
   if (!product) return <div className="error-container">Sản phẩm không tồn tại.</div>;
@@ -66,8 +91,12 @@ const ProductDetailPage = () => {
           </div>
 
           <div className="detail-actions">
-            <button className="add-to-cart-btn" disabled={product.inventory_quantity === 0}>
-              {product.inventory_quantity > 0 ? 'Thêm vào giỏ hàng' : 'Hết hàng'}
+            <button 
+                className="add-to-cart-btn" 
+                disabled={product.inventory_quantity === 0 || adding}
+                onClick={handleAddToCart}
+            >
+              {adding ? 'Đang xử lý...' : (product.inventory_quantity > 0 ? 'Thêm vào giỏ hàng' : 'Hết hàng')}
             </button>
           </div>
         </div>
