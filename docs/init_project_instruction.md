@@ -29,3 +29,20 @@ cd project-name
 
 # Nếu đã clone trước đó, chỉ cần update
 git pull origin main   # hoặc branch tương ứng
+
+
+#Sau đó, chạy các lệnh sau.
+
+# Ở folder backend
+uv sync # Để cài các package
+alembic upgrade head # Cập nhật các thay đổi của database
+
+# Ở folder frontend/TheWineShop
+npm install
+
+
+# Nếu muốn khởi chạy local backend:
+uv run uvicorn src.main:app --reload # cd đến folder backend
+
+# Nếu muốn khởi chạy local frontend:
+npm run dev # cd đến folder frontend/TheWineShop
