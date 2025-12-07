@@ -59,3 +59,14 @@
     background-color: #ccc;
     cursor: not-allowed;
 }
+
+.input-error {
+    border-color: #dc3545 !important;
+}
+
+.error-text {
+    color: #dc3545;
+    font-size: 0.85rem;
+    margin-top: 5px;
+    margin-bottom: 0;
+}

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import axiosClient from '../api/axiosClient';
 import ProductCard from '../components/ProductCard';
 import { Link } from 'react-router-dom';
+import Skeleton from '../components/Skeleton';
 import './HomePage.css';
 
 const HomePage = () => {
@@ -37,7 +38,11 @@ const HomePage = () => {
         <h2 className="section-title">Sản Phẩm Nổi Bật</h2>
         
         {loading ? (
-          <div className="loading">Đang tải danh sách rượu...</div>
+          <div className="product-grid">
+             {[...Array(8)].map((_, index) => (
+                 <Skeleton key={index} type="product-card" />
+             ))}
+          </div>
         ) : (
           <div className="product-grid">
             {wines.map(wine => (

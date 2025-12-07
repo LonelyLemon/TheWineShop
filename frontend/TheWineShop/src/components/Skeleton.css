@@ -1,0 +1,21 @@
+.skeleton {
+    background-color: #ddd;
+    border-radius: 4px;
+    animation: skeleton-loading 1s linear infinite alternate;
+}
+
+@keyframes skeleton-loading {
+    0% { background-color: #e0e0e0; }
+    100% { background-color: #f0f0f0; }
+}
+
+.skeleton.product-card {
+    height: 350px;
+    width: 100%;
+}
+
+.skeleton.text {
+    height: 20px;
+    width: 100%;
+    margin-bottom: 10px;
+}

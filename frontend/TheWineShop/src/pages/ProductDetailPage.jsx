@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
 import { toast } from 'react-toastify';
 import './ProductDetailPage.css';
+import { useCart } from '../context/CartContext';
 
 const ProductDetailPage = () => {
   const { id } = useParams();
@@ -10,6 +11,7 @@ const ProductDetailPage = () => {
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
+  const { refreshCart } = useCart();
 
   useEffect(() => {
     const fetchDetail = async () => {
@@ -40,6 +42,8 @@ const ProductDetailPage = () => {
             quantity: 1
         });
         toast.success("Đã thêm vào giỏ hàng!");
+
+        refreshCart();
         
     } catch (error) {
         console.error(error);
