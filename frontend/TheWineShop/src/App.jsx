@@ -13,6 +13,7 @@ import MainLayout from './layouts/MainLayout';
 import CartPage from './pages/CartPage';
 import CheckoutPage from './pages/CheckoutPage';
 import OrdersPage from './pages/OrdersPage';
+import AdminOrdersPage from './pages/admin/AdminOrdersPage';
 import './App.css';
 
 function App() {
@@ -31,6 +32,7 @@ function App() {
            <Route path="/cart" element={<CartPage />} />
            <Route path="/checkout" element={<CheckoutPage />} />
            <Route path="/orders" element={<OrdersPage />} />
+           <Route path="/admin/orders" element={<AdminOrdersPage />} />
         </Route>
       </Routes>
     </>
