@@ -75,7 +75,10 @@ return (
                     )}
                     
                     {user.role === 'admin' && (
-                        <Link to="/admin/orders" className="dropdown-item" onClick={() => setShowDropdown(false)}>Quản lý Đơn (Admin)</Link>
+                        <>
+                          <Link to="/admin/orders" className="dropdown-item" onClick={() => setShowDropdown(false)}>Quản lý Đơn hàng</Link>
+                          <Link to="/admin/users" className="dropdown-item" onClick={() => setShowDropdown(false)}>Quản lý Người dùng</Link>
+                        </>
                     )}
                     
                     <div className="divider"></div>

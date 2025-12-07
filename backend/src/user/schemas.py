@@ -62,6 +62,8 @@ class UserResponse(UserBase):
     address: Optional[str] = None
     birthdate: Optional[datetime] = None
     role: str
+    status: str
+    created_at: datetime
     
 
     class Config:
