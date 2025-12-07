@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from typing import List
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func, and_
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from decimal import Decimal
@@ -141,84 +142,95 @@ async def create_order(
     db: SessionDep,
     current_user: User = Depends(get_current_user)
 ):
+    # 1. Lấy giỏ hàng
     cart = await get_or_create_cart(db, current_user.id)
-    
     if not cart.items:
-        raise HTTPException(status_code=400, detail="Giỏ hàng trống, không thể đặt hàng")
+        raise HTTPException(status_code=400, detail="Giỏ hàng trống")
 
-    total_amount = Decimal(0)
-    
-    for item in cart.items:
-        inventory_records = await db.execute(select(Inventory).where(Inventory.wine_id == item.wine_id))
-        inventories = inventory_records.scalars().all()
-        total_stock = sum(inv.quantity_available for inv in inventories)
+    try:
+        total_amount = Decimal(0)
         
-        if total_stock < item.quantity:
-            raise HTTPException(
-                status_code=400, 
-                detail=f"Sản phẩm {item.wine.name} không đủ hàng (Còn: {total_stock})"
-            )
-            
-        total_amount += item.quantity * item.wine.price
-
-    new_order = Order(
-        user_id=current_user.id,
-        status="pending",
-        total_amount=total_amount,
-        payment_method=payload.payment_method,
-        shipping_address=payload.shipping_address,
-        phone_number=payload.phone_number,
-        note=payload.note,
-        created_at=datetime.now(timezone.utc)
-    )
-    db.add(new_order)
-    await db.flush()
-
-    for item in cart.items:
-        order_item = OrderItem(
-            order_id=new_order.id,
-            wine_id=item.wine_id,
-            quantity=item.quantity,
-            price_at_purchase=item.wine.price
+        # 2. Tạo Order Header
+        new_order = Order(
+            user_id=current_user.id,
+            status="pending",
+            total_amount=0, 
+            payment_method=payload.payment_method,
+            shipping_address=payload.shipping_address,
+            phone_number=payload.phone_number,
+            note=payload.note,
+            created_at=datetime.utcnow()
         )
-        db.add(order_item)
+        db.add(new_order)
+        await db.flush()
 
-        inv_query = select(Inventory).where(
-            Inventory.wine_id == item.wine_id, 
-            Inventory.quantity_available > 0
-        ).order_by(Inventory.import_date)
-        
-        inv_result = await db.execute(inv_query)
-        available_batches = inv_result.scalars().all()
-        
-        qty_needed = item.quantity
-        
-        for batch in available_batches:
-            if qty_needed <= 0:
-                break
+        # 3. Duyệt từng sản phẩm trong giỏ để xử lý Kho & Tạo OrderItem
+        for item in cart.items:
+            stmt = select(Inventory).where(
+                Inventory.wine_id == item.wine_id,
+                Inventory.quantity_available > 0
+            ).order_by(Inventory.import_date).with_for_update()
             
-            if batch.quantity_available >= qty_needed:
-                batch.quantity_available -= qty_needed
-                qty_needed = 0
-            else:
-                qty_needed -= batch.quantity_available
-                batch.quantity_available = 0
+            result = await db.execute(stmt)
+            available_batches = result.scalars().all()
             
-            db.add(batch)
+            # Tính tổng tồn kho hiện có
+            current_stock = sum(batch.quantity_available for batch in available_batches)
+            
+            if current_stock < item.quantity:
+                # Nếu không đủ hàng -> Rollback
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Sản phẩm {item.wine.name} không đủ hàng (Còn: {current_stock})"
+                )
 
-    for item in cart.items:
-        await db.delete(item)
+            # Thực hiện trừ kho (FIFO)
+            qty_needed = item.quantity
+            for batch in available_batches:
+                if qty_needed <= 0: break
+                
+                deduct = min(batch.quantity_available, qty_needed)
+                batch.quantity_available -= deduct
+                qty_needed -= deduct
+                db.add(batch)
 
-    await db.commit()
-    await db.refresh(new_order)
-    
+            # Tạo Order Item
+            order_item = OrderItem(
+                order_id=new_order.id,
+                wine_id=item.wine_id,
+                quantity=item.quantity,
+                price_at_purchase=item.wine.price
+            )
+            db.add(order_item)
+            
+            # Cộng dồn tổng tiền
+            total_amount += item.quantity * item.wine.price
+
+        # Cập nhật lại tổng tiền cho Order
+        new_order.total_amount = total_amount
+        db.add(new_order)
+
+        # 4. Xóa giỏ hàng
+        for item in cart.items:
+            await db.delete(item)
+
+        # 5. Commit transaction
+        await db.commit()
+        await db.refresh(new_order)
+
+    except HTTPException as http_ex:
+        raise http_ex
+    except Exception as e:
+        print(f"Error creating order: {e}")
+        raise HTTPException(status_code=500, detail="Lỗi hệ thống khi tạo đơn hàng")
+
+    # 6. Return Data
     query = select(Order).options(
-        selectinload(Order.items).selectinload(OrderItem.wine).selectinload(Wine.images)
+        selectinload(Order.items).selectinload(OrderItem.wine).selectinload(Wine.images),
+        selectinload(Order.items).selectinload(OrderItem.wine).selectinload(Wine.category)
     ).where(Order.id == new_order.id)
     result = await db.execute(query)
-    final_order = result.scalar_one()
-
-    return final_order
+    return result.scalar_one()
 
 
 @cart_router.get("/orders", response_model=List[OrderResponse])

@@ -33,7 +33,8 @@ async def get_wines(
 ):
     query = select(Wine).options(
         selectinload(Wine.category),
-        selectinload(Wine.images)
+        selectinload(Wine.images),
+        selectinload(Wine.inventory_items)
     ).where(Wine.is_active == True)
 
     if category_slug:
