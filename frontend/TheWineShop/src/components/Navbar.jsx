@@ -71,7 +71,9 @@ return (
                     <Link to="/profile" className="dropdown-item" onClick={() => setShowDropdown(false)}>Hồ sơ cá nhân</Link>
                     
                     {(user.role === 'admin' || user.role === 'stock_manager') && (
-                        <div className="divider"></div>
+                        <>
+                            <Link to="/admin/products" className="dropdown-item" onClick={() => setShowDropdown(false)}>Quản lý Sản phẩm</Link>
+                        </>
                     )}
                     
                     {user.role === 'admin' && (

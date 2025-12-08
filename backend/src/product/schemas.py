@@ -1,8 +1,37 @@
 from typing import List, Optional
 from uuid import UUID
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from decimal import Decimal
+
+
+class WineCreate(BaseModel):
+    name: str = Field(..., min_length=1)
+    description: Optional[str] = None
+    price: Decimal
+    alcohol_percentage: Optional[Decimal] = None
+    volume: Optional[int] = None
+    country: Optional[str] = None
+    region: Optional[str] = None
+    vintage: Optional[int] = None
+    category_id: UUID
+    
+    images: List[str] = []
+
+
+class WineUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    price: Optional[Decimal] = None
+    alcohol_percentage: Optional[Decimal] = None
+    volume: Optional[int] = None
+    country: Optional[str] = None
+    region: Optional[str] = None
+    vintage: Optional[int] = None
+    category_id: Optional[UUID] = None
+    is_active: Optional[bool] = None
+    
+    images: Optional[List[str]] = None
 
 
 class CategoryBase(BaseModel):
