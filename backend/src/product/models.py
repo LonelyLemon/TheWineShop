@@ -15,29 +15,74 @@ class Category(Base):
     
     wines = relationship("Wine", back_populates="category")
 
+class Region(Base):
+    __tablename__ = "regions"
+
+    name = Column(String(255), nullable=False, index=True)
+    description = Column(Text, nullable=True)
+    map_image_url = Column(String(512), nullable=True)
+    
+    wineries = relationship("Winery", back_populates="region")
+
+class Winery(Base):
+    __tablename__ = "wineries"
+
+    name = Column(String(255), nullable=False, index=True)
+    description = Column(Text, nullable=True)
+    phone_number = Column(String(50), nullable=True)
+    fax_number = Column(String(50), nullable=True)
+    
+    region_id = Column(UUID(as_uuid=True), ForeignKey("regions.id"), nullable=True)
+    
+    region = relationship("Region", back_populates="wineries")
+    wines = relationship("Wine", back_populates="winery")
+
+class GrapeVariety(Base):
+    __tablename__ = "grape_varieties"
+
+    name = Column(String(100), nullable=False, unique=True)
+    
+    # Quan hệ với bảng trung gian
+    wine_associations = relationship("WineGrape", back_populates="grape_variety")
+
+class WineGrape(Base):
+    __tablename__ = "wine_grapes"
+
+    wine_id = Column(UUID(as_uuid=True), ForeignKey("wine_info.id"), primary_key=True)
+    grape_variety_id = Column(UUID(as_uuid=True), ForeignKey("grape_varieties.id"), primary_key=True)
+    
+    percentage = Column(Integer, nullable=True)
+    order = Column(Integer, default=0) # Thứ tự ưu tiên (Cabernet Merlot != Merlot Cabernet)
+
+    wine = relationship("Wine", back_populates="grape_composition")
+    grape_variety = relationship("GrapeVariety", back_populates="wine_associations")
+
 class Wine(Base):
     __tablename__ = "wine_info"
 
     name = Column(String(255), nullable=False, index=True)
     slug = Column(String(255), unique=True, index=True)
     description = Column(Text, nullable=True)
-    alcohol_percentage = Column(DECIMAL(4, 1), nullable=True)
-    volume = Column(Integer, nullable=True)
-    country = Column(String(100), nullable=True)
-    region = Column(String(100), nullable=True)
-    vintage = Column(Integer, nullable=True)
     
+    # Thông số kỹ thuật
+    alcohol_percentage = Column(DECIMAL(4, 1), nullable=True)
+    volume = Column(Integer, nullable=True) # ml
+    vintage = Column(Integer, nullable=True) # Năm sản xuất
     
     price = Column(DECIMAL(12, 2), nullable=False, default=0)
-    
-    
-    category_id = Column(UUID(as_uuid=True), ForeignKey("category.id"), nullable=True)
-    
-    
     is_active = Column(Boolean, default=True)
 
+    # Foreign Keys
+    category_id = Column(UUID(as_uuid=True), ForeignKey("category.id"), nullable=True)
+    winery_id = Column(UUID(as_uuid=True), ForeignKey("wineries.id"), nullable=True) # Thay thế country/region text cũ
     
+    # Relationships
     category = relationship("Category", back_populates="wines")
+    winery = relationship("Winery", back_populates="wines")
+    
+    # Quan hệ N-N với GrapeVariety thông qua bảng trung gian
+    grape_composition = relationship("WineGrape", back_populates="wine", cascade="all, delete-orphan")
+    
     images = relationship("WineImage", back_populates="wine", cascade="all, delete-orphan")
     inventory_items = relationship("Inventory", back_populates="wine")
     reviews = relationship("ProductReview", back_populates="wine")
