@@ -22,7 +22,9 @@ const ProductCard = ({ product }) => {
         <h3 className="product-name" title={product.name}>
           <Link to={`/products/${product.id}`}>{product.name}</Link>
         </h3>
-        <p className="product-origin">{product.region}, {product.country}</p>
+        <p className="product-origin">
+            {product.winery_name} - {product.region_name}
+        </p>
         <div className="product-price">{formatPrice(product.price)}</div>
         
         <Link to={`/products/${product.id}`} className="view-btn">

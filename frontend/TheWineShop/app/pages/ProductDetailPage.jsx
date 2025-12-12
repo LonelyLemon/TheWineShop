@@ -58,6 +58,10 @@ const ProductDetailPage = () => {
 
   const price = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(product.price);
 
+  const grapeList = product.grapes && product.grapes.length > 0 
+    ? product.grapes.map(g => `${g.grape_variety.name} (${g.percentage}%)`).join(', ')
+    : 'Chưa cập nhật';
+
   return (
     <div className="container product-detail-page">
       <Link to="/" className="back-link">← Quay lại trang chủ</Link>
@@ -75,8 +79,8 @@ const ProductDetailPage = () => {
         <div className="detail-info">
           <h1 className="detail-name">{product.name}</h1>
           <div className="detail-meta">
-            <span>Xuất xứ: <strong>{product.country}</strong></span> | 
-            <span> Vùng: <strong>{product.region}</strong></span> |
+            <span> Nhà sản xuất: <strong>{product.winery?.name}</strong></span> | 
+            <span> Vùng: <strong>{product.winery?.region?.name}</strong></span> |
             <span> Niên vụ: <strong>{product.vintage}</strong></span>
           </div>
           
@@ -88,6 +92,7 @@ const ProductDetailPage = () => {
           </div>
 
           <div className="detail-specs">
+            <p><strong>Giống nho:</strong> {grapeList}</p>
             <p><strong>Nồng độ:</strong> {product.alcohol_percentage}%</p>
             <p><strong>Dung tích:</strong> {product.volume}ml</p>
             <p><strong>Loại vang:</strong> {product.category?.name}</p>
