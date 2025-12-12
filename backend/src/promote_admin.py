@@ -1,7 +1,13 @@
 import asyncio
+import sys
+
+from pathlib import Path
 from sqlalchemy import select
 from src.core.database import SessionLocal
 from src.user.models import User
+
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 async def promote_user(email: str):
     async with SessionLocal() as db:

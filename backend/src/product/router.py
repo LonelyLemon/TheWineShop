@@ -251,7 +251,7 @@ async def update_wine(
 
     update_data = payload.model_dump(exclude_unset=True)
     
-    # Handle Images Update
+    # 1. Update Images
     if "images" in update_data:
         images = update_data.pop("images")
         existing_imgs = await db.execute(select(WineImage).where(WineImage.wine_id == wine.id))
@@ -260,10 +260,29 @@ async def update_wine(
         for url in images:
             db.add(WineImage(wine_id=wine.id, image_url=url))
             
+    # 2. Update Grapes
+    if "grapes" in update_data:
+        grapes_data = update_data.pop("grapes")
+        
+        existing_grapes = await db.execute(select(WineGrape).where(WineGrape.wine_id == wine.id))
+        for g in existing_grapes.scalars().all():
+            await db.delete(g)
+        
+        for item in grapes_data:
+            if item.get("grape_variety_id"): 
+                new_comp = WineGrape(
+                    wine_id=wine.id,
+                    grape_variety_id=item["grape_variety_id"],
+                    percentage=item.get("percentage"),
+                    order=item.get("order")
+                )
+                db.add(new_comp)
+
     for key, value in update_data.items():
         setattr(wine, key, value)
 
     await db.commit()
+    
     return await get_wine_detail(wine.id, db)
 
 @product_router.delete("/wines/{wine_id}")

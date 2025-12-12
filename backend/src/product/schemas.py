@@ -124,3 +124,4 @@ class WineUpdate(BaseModel):
     winery_id: Optional[UUID] = None
     
     images: Optional[List[str]] = None
+    grapes: Optional[List[WineGrapeCreate]] = None
