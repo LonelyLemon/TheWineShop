@@ -21,43 +21,72 @@ const OrdersPage = () => {
   }, []);
 
   const formatPrice = (val) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val);
-  const formatDate = (dateString) => new Date(dateString).toLocaleString('vi-VN');
+
+  const getStatusColor = (status) => {
+      switch(status) {
+          case 'pending': return 'orange';
+          case 'shipping': return 'blue';
+          case 'completed': return 'green';
+          case 'cancelled': return 'red';
+          default: return 'gray';
+      }
+  };
+
+  const getDeliveryLabel = (mode) => {
+      switch(mode) {
+          case 'express': return 'Hỏa tốc';
+          case 'sea': return 'Đường biển';
+          default: return 'Tiêu chuẩn';
+      }
+  };
 
   if (loading) return <div className="loading-center">Đang tải lịch sử...</div>;
 
   return (
-    <div className="orders-page-container">
+    <div className="container orders-page">
       <h1>Lịch sử đơn hàng</h1>
-      
       {orders.length === 0 ? (
-          <p className="no-orders">Bạn chưa có đơn hàng nào.</p>
+          <p>Bạn chưa có đơn hàng nào.</p>
       ) : (
           <div className="orders-list">
               {orders.map(order => (
                   <div key={order.id} className="order-card">
                       <div className="order-header">
-                          <div className="order-info-left">
-                              <div className="order-id"><strong>Mã đơn:</strong> #{order.id.slice(0, 8)}</div>
-                              <div className="order-date">{formatDate(order.created_at)}</div>
+                          <div>
+                              <span className="order-id">Đơn hàng #{order.id.slice(0, 8)}...</span>
+                              <span className="order-date">{new Date(order.created_at).toLocaleDateString('vi-VN')}</span>
                           </div>
-                          
-                          <div className="order-info-right">
-                              <span className={`order-status-badge status-${order.status}`}>
-                                  {order.status}
-                              </span>
-                              <span className="order-total-price">
-                                  {formatPrice(order.total_amount)}
-                              </span>
-                          </div>
+                          <span className="order-status" style={{color: getStatusColor(order.status)}}>
+                              {order.status.toUpperCase()}
+                          </span>
                       </div>
-                      
-                      <div className="order-items-list">
-                          {order.items.map((item, index) => (
-                              <div key={index} className="order-item-row">
-                                  <span>• {item.wine.name} <strong>(x{item.quantity})</strong></span>
-                                  <span>{formatPrice(item.price_at_purchase)}</span>
+
+                      <div className="order-items">
+                          {order.items.map(item => (
+                              <div key={item.id} className="order-item">
+                                  <img src={item.wine.thumbnail || "https://via.placeholder.com/50"} alt={item.wine.name} />
+                                  <div className="item-details">
+                                      <span className="item-name">{item.wine.name}</span>
+                                      <span className="item-qty">x{item.quantity}</span>
+                                  </div>
+                                  <span className="item-price">{formatPrice(item.price_at_purchase * item.quantity)}</span>
                               </div>
                           ))}
+                      </div>
+
+                      <div className="order-footer">
+                          <div className="order-summary-row">
+                              <span>Phương thức vận chuyển:</span>
+                              <strong>{getDeliveryLabel(order.delivery_mode)}</strong>
+                          </div>
+                          <div className="order-summary-row">
+                              <span>Phí giao hàng:</span>
+                              <span>{formatPrice(order.delivery_cost)}</span>
+                          </div>
+                          <div className="order-total">
+                              <span>Tổng cộng:</span>
+                              <span className="total-price">{formatPrice(order.total_amount)}</span>
+                          </div>
                       </div>
                   </div>
               ))}

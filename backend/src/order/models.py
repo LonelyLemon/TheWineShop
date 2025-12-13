@@ -35,6 +35,9 @@ class Order(Base):
     status = Column(String(50), default="pending")
     total_amount = Column(DECIMAL(12, 2), nullable=False)
     
+    delivery_mode = Column(String(50), default="regular")
+    delivery_cost = Column(DECIMAL(12, 2), default=0)
+    
     payment_method = Column(String(50), default="cod")
     shipping_address = Column(Text, nullable=False)
     phone_number = Column(String(20), nullable=False)

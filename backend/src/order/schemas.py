@@ -6,15 +6,12 @@ from pydantic import BaseModel, field_validator
 from decimal import Decimal
 from datetime import datetime
 
-from src.product.schemas import WineListResponse 
-
-
-PHONE_REGEX = r"(84|0[3|5|7|8|9])+([0-9]{8})\b"
+from src.product.schemas import WineListResponse
 
 
 class CartItemCreate(BaseModel):
     wine_id: UUID
-    quantity: int = 1
+    quantity: int
 
 class CartItemUpdate(BaseModel):
     quantity: int
@@ -29,9 +26,9 @@ class CartItemResponse(BaseModel):
         from_attributes = True
 
 class CartResponse(BaseModel):
-    id: UUID
-    items: List[CartItemResponse] = []
-    total_price: Decimal
+    id: Optional[UUID] = None
+    items: List[dict] = []
+    total_price: float
 
     class Config:
         from_attributes = True
@@ -41,31 +38,35 @@ class OrderCreate(BaseModel):
     shipping_address: str
     phone_number: str
     note: Optional[str] = None
-    payment_method: str = "cod"
 
-    @field_validator('phone_number')
-    def validate_phone(cls, v):
-        if not re.match(PHONE_REGEX, v):
-            raise ValueError('Số điện thoại không hợp lệ')
-        return v
+    payment_method: str = "cod"
+    delivery_mode: str = "regular"
     
 
 class OrderItemResponse(BaseModel):
+    id: UUID
     wine: WineListResponse
     quantity: int
-    price_at_purchase: Decimal
+    price_at_purchase: float
 
     class Config:
         from_attributes = True
 
+
 class OrderResponse(BaseModel):
     id: UUID
     status: str
-    total_amount: Decimal
+    total_amount: float
+
+    delivery_mode: str
+    delivery_cost: float
+
+    payment_method: str
     shipping_address: str
     phone_number: str
-    payment_method: str
+    note: Optional[str] = None
     created_at: datetime
+    
     items: List[OrderItemResponse] = []
 
     class Config:

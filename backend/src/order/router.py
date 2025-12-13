@@ -1,5 +1,3 @@
-# src/order/router.py
-# Update Start: Full refactor for Guest Cart & Inventory Pricing Logic
 from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
@@ -17,6 +15,7 @@ from src.user.models import User
 from src.order.models import Cart, CartItem, Order, OrderItem
 from src.product.models import Wine, Inventory
 from src.order.schemas import CartResponse, CartItemCreate, OrderCreate, OrderResponse
+from src.product.schemas import CategoryBase, WineListResponse
 
 cart_router = APIRouter(
     prefix="/cart",
@@ -80,6 +79,14 @@ async def get_or_create_cart_helper(db: SessionDep, user: User | None, session_i
         
     return cart
 
+def calculate_shipping_fee(mode: str, total_items_price: Decimal) -> Decimal:
+    if mode == "express":
+        return Decimal(50000) # Giao nhanh: 50k
+    elif mode == "sea":
+        return Decimal(20000) # Đường biển: 20k
+    else:
+        return Decimal(30000) # Mặc định: 30k
+    
 
 @cart_router.get("", response_model=CartResponse)
 async def get_my_cart(
@@ -107,14 +114,18 @@ async def get_my_cart(
             thumb_obj = next((img for img in wine_resp.images if img.is_thumbnail), None)
             if not thumb_obj: thumb_obj = wine_resp.images[0]
             thumb = thumb_obj.image_url
-            
+        
+        category_data = None
+        if wine_resp.category:
+            category_data = CategoryBase.model_validate(wine_resp.category).model_dump()
+
         wine_dict = {
             "id": wine_resp.id,
             "name": wine_resp.name,
             "slug": wine_resp.slug,
             "price": item.price_at_add,
             "thumbnail": thumb,
-            "category": wine_resp.category
+            "category": category_data
         }
 
         response_items.append({
@@ -201,12 +212,24 @@ async def create_order(
         raise HTTPException(status_code=400, detail="Giỏ hàng trống")
     
     try:
-        total_amount = Decimal(0)
+        # 1. Tính tổng tiền hàng
+        items_total = sum(item.quantity * item.price_at_add for item in cart.items)
         
+        # 2. Tính phí ship
+        shipping_fee = calculate_shipping_fee(payload.delivery_mode, items_total)
+        
+        # 3. Tổng tiền cuối cùng
+        final_total = items_total + shipping_fee
+
+        # 4. Tạo Order
         new_order = Order(
             user_id=current_user.id,
             status="pending",
-            total_amount=0, 
+
+            total_amount=final_total,
+            delivery_mode=payload.delivery_mode,
+            delivery_cost=shipping_fee,
+            
             payment_method=payload.payment_method,
             shipping_address=payload.shipping_address,
             phone_number=payload.phone_number,
@@ -216,6 +239,7 @@ async def create_order(
         db.add(new_order)
         await db.flush()
 
+        # 5. Xử lý kho & Order Items
         for item in cart.items:
             stmt = select(Inventory).where(
                 Inventory.wine_id == item.wine_id,
@@ -226,8 +250,12 @@ async def create_order(
             available_batches = result.scalars().all()
             
             current_stock = sum(batch.quantity_available for batch in available_batches)
+            
             if current_stock < item.quantity:
-                raise HTTPException(status_code=400, detail=f"Sản phẩm {item.wine.name} không đủ hàng")
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Sản phẩm {item.wine.name} không đủ hàng (Còn: {current_stock})"
+                )
 
             qty_needed = item.quantity
             for batch in available_batches:
@@ -237,18 +265,16 @@ async def create_order(
                 qty_needed -= deduct
                 db.add(batch)
 
+            # Tạo OrderItem
             order_item = OrderItem(
                 order_id=new_order.id,
                 wine_id=item.wine_id,
                 quantity=item.quantity,
-                price_at_purchase=item.price_at_add 
+                price_at_purchase=item.price_at_add
             )
             db.add(order_item)
-            total_amount += item.quantity * item.price_at_add
 
-        new_order.total_amount = total_amount
-        db.add(new_order)
-
+        # 6. Xóa cart
         for item in cart.items:
             await db.delete(item)
 
@@ -258,8 +284,8 @@ async def create_order(
     except HTTPException as http_ex:
         raise http_ex
     except Exception as e:
-        print(f"Error: {e}")
-        raise HTTPException(status_code=500, detail="Lỗi tạo đơn hàng")
+        print(f"Error creating order: {e}")
+        raise HTTPException(status_code=500, detail="Lỗi hệ thống khi tạo đơn hàng")
 
     query = select(Order).options(
         selectinload(Order.items).selectinload(OrderItem.wine).selectinload(Wine.images),

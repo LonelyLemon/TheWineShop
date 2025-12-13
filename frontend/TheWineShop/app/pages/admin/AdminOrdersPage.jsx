@@ -1,26 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import axiosClient from '../../api/axiosClient';
 import { toast } from 'react-toastify';
-import { useNavigate } from 'react-router-dom';
 import './AdminOrdersPage.css';
 
 const AdminOrdersPage = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
 
   const fetchOrders = async () => {
     try {
       const response = await axiosClient.get('/api/admin/orders');
       setOrders(response.data);
+    // eslint-disable-next-line no-unused-vars
     } catch (error) {
-      console.error(error);
-      if (error.response && error.response.status === 403) {
-        toast.error("Bạn không có quyền truy cập trang này!");
-        navigate('/');
-      } else {
-        toast.error("Lỗi khi tải danh sách đơn hàng");
-      }
+      toast.error("Không thể tải danh sách đơn hàng");
     } finally {
       setLoading(false);
     }
@@ -28,93 +21,95 @@ const AdminOrdersPage = () => {
 
   useEffect(() => {
     fetchOrders();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleStatusChange = async (orderId, newStatus) => {
-    try {
-      await axiosClient.put(`/api/admin/orders/${orderId}/status`, {
-        status: newStatus
-      });
-      
-      toast.success(`Đã cập nhật trạng thái thành: ${newStatus}`);
-      
-      fetchOrders(); 
-      
-    // eslint-disable-next-line no-unused-vars
-    } catch (error) {
-      toast.error("Cập nhật thất bại");
-    }
+      try {
+          await axiosClient.put(`/api/admin/orders/${orderId}/status`, { status: newStatus });
+          toast.success("Cập nhật trạng thái thành công");
+          fetchOrders();
+      // eslint-disable-next-line no-unused-vars
+      } catch (error) {
+          toast.error("Lỗi cập nhật trạng thái");
+      }
   };
 
-  const formatPrice = (val) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val);
-  const formatDate = (dateString) => new Date(dateString).toLocaleString('vi-VN');
+  const formatPrice = (price) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
 
-  const STATUS_OPTIONS = [
-    { value: 'pending', label: 'Chờ xử lý', color: '#ffc107' },
-    { value: 'confirmed', label: 'Đã xác nhận', color: '#17a2b8' },
-    { value: 'shipping', label: 'Đang giao', color: '#007bff' },
-    { value: 'completed', label: 'Hoàn thành', color: '#28a745' },
-    { value: 'cancelled', label: 'Đã hủy', color: '#dc3545' },
-  ];
+  const getDeliveryBadge = (mode) => {
+      const styles = {
+          express: { background: '#ff4d4f', color: 'white', padding: '2px 6px', borderRadius: '4px', fontSize: '11px' },
+          sea: { background: '#1890ff', color: 'white', padding: '2px 6px', borderRadius: '4px', fontSize: '11px' },
+          regular: { background: '#52c41a', color: 'white', padding: '2px 6px', borderRadius: '4px', fontSize: '11px' }
+      };
+      const labels = { express: 'Hỏa tốc', sea: 'Đường biển', regular: 'Tiêu chuẩn' };
+      return <span style={styles[mode] || styles.regular}>{labels[mode] || mode}</span>;
+  };
 
-  if (loading) return <div className="admin-loading">Đang tải dữ liệu quản trị...</div>;
+  if (loading) return <div>Đang tải...</div>;
 
   return (
     <div className="admin-container">
-      <div className="admin-header">
-        <h1>Quản lý Đơn hàng (Admin)</h1>
-        <button className="refresh-btn" onClick={fetchOrders}>🔄 Làm mới</button>
-      </div>
-
+      <h1>Quản lý Đơn hàng</h1>
       <div className="table-responsive">
         <table className="admin-table">
           <thead>
             <tr>
-              <th>Mã đơn</th>
+              <th>Mã đơn / Ngày</th>
               <th>Khách hàng</th>
-              <th>Ngày đặt</th>
+              <th>Giao hàng & Địa chỉ</th>
               <th>Tổng tiền</th>
-              <th>Trạng thái hiện tại</th>
-              <th>Thao tác</th>
+              <th>Trạng thái</th>
             </tr>
           </thead>
           <tbody>
             {orders.map(order => (
               <tr key={order.id}>
                 <td>
-                    <span className="order-uuid" title={order.id}>#{order.id.slice(0, 8)}</span>
+                    <strong>#{order.id.slice(0,8)}</strong>
                     <br/>
-                    <small>{order.items.length} sản phẩm</small>
+                    <small>{new Date(order.created_at).toLocaleDateString('vi-VN')}</small>
                 </td>
                 <td>
-                    {order.phone_number} <br/>
-                    <small className="text-muted">{order.shipping_address}</small>
+                    {order.items[0]?.wine?.name ? (
+                        <>
+                            {order.items[0].wine.name} <br/>
+                            {order.items.length > 1 && <small style={{color: '#888'}}>+ {order.items.length - 1} sản phẩm khác</small>}
+                        </>
+                    ) : "---"}
+                    <div style={{marginTop: '5px', fontSize: '12px'}}>
+                        Khách: {order.phone_number}
+                    </div>
                 </td>
-                <td>{formatDate(order.created_at)}</td>
-                <td style={{fontWeight: 'bold', color: '#800020'}}>{formatPrice(order.total_amount)}</td>
-                <td>
-                   <span 
-                      className="status-badge-admin"
-                      style={{
-                          backgroundColor: STATUS_OPTIONS.find(s => s.value === order.status)?.color || '#ccc'
-                      }}
-                   >
-                      {STATUS_OPTIONS.find(s => s.value === order.status)?.label || order.status}
-                   </span>
+                
+                <td style={{maxWidth: '300px'}}>
+                    <div style={{marginBottom: '5px'}}>
+                        {getDeliveryBadge(order.delivery_mode)} - Phí: {formatPrice(order.delivery_cost)}
+                    </div>
+                    <div style={{fontSize: '13px', lineHeight: '1.4'}}>
+                        📍 {order.shipping_address}
+                    </div>
+                    {order.note && <div style={{fontSize: '12px', fontStyle: 'italic', color: '#d46b08', marginTop: '3px'}}>📝 Note: {order.note}</div>}
                 </td>
+
                 <td>
-                  <select 
-                    className="status-select"
-                    value={order.status}
-                    onChange={(e) => handleStatusChange(order.id, e.target.value)}
-                  >
-                    {STATUS_OPTIONS.map(opt => (
-                        <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                        </option>
-                    ))}
-                  </select>
+                    <strong>{formatPrice(order.total_amount)}</strong>
+                    <br/>
+                    <small>{order.payment_method.toUpperCase()}</small>
+                </td>
+                
+                <td>
+                    <select 
+                        value={order.status}
+                        onChange={(e) => handleStatusChange(order.id, e.target.value)}
+                        className={`status-select status-${order.status}`}
+                    >
+                        <option value="pending">Chờ xác nhận</option>
+                        <option value="confirmed">Đã xác nhận</option>
+                        <option value="shipping">Đang giao</option>
+                        <option value="completed">Hoàn thành</option>
+                        <option value="cancelled">Hủy đơn</option>
+                    </select>
                 </td>
               </tr>
             ))}
