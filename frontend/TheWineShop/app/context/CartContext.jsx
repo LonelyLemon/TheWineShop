@@ -8,15 +8,9 @@ export const CartProvider = ({ children }) => {
   const [shouldRefreshCart, setShouldRefreshCart] = useState(false); 
 
   const fetchCartCount = async () => {
-    const token = localStorage.getItem('access_token');
-    if (!token) {
-        setCartCount(0);
-        return;
-    }
-
     try {
       const response = await axiosClient.get('/api/cart');
-      const totalItems = response.data.items.reduce((acc, item) => acc + item.quantity, 0);
+      const totalItems = response.data.items ? response.data.items.reduce((acc, item) => acc + item.quantity, 0) : 0;
       setCartCount(totalItems);
     } catch (error) {
       console.error("Failed to fetch cart count", error);

@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, String, Integer, ForeignKey, Boolean, Text, DECIMAL, DateTime
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
@@ -107,7 +107,9 @@ class Inventory(Base):
     batch_code = Column(String(50), nullable=True)
     quantity_available = Column(Integer, default=0)
     
-    import_date = Column(DateTime, default=datetime.utcnow)
+    import_price = Column(DECIMAL(12, 2), nullable=True)
+
+    import_date = Column(DateTime, default=datetime.now(timezone.utc))
     expiry_date = Column(DateTime, nullable=True)
     shelf_location = Column(String(100), nullable=True)
     

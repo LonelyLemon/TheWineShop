@@ -19,7 +19,8 @@ from src.product.schemas import (
     WineUpdate,
     RegionBase,
     WineryBase,
-    GrapeVarietyBase
+    GrapeVarietyBase,
+    InventoryImport
 )
 
 product_router = APIRouter(
@@ -236,6 +237,31 @@ async def create_wine(
     
     # Return detail
     return await get_wine_detail(new_wine.id, db)
+
+
+@product_router.post("/wines/{wine_id}/inventory")
+async def add_inventory(
+    wine_id: UUID,
+    payload: InventoryImport,
+    db: SessionDep,
+    current_user: User = Depends(allow_staff)
+):
+    wine = await db.get(Wine, wine_id)
+    if not wine:
+        raise HTTPException(status_code=404, detail="Sản phẩm không tồn tại")
+    
+    new_inventory = Inventory(
+        wine_id=wine.id,
+        quantity_available=payload.quantity,
+        import_price=payload.import_price,
+        batch_code=payload.batch_code or f"BATCH-{int(datetime.utcnow().timestamp())}",
+        import_date=datetime.utcnow()
+    )
+    
+    db.add(new_inventory)
+    await db.commit()
+    
+    return {"message": "Đã nhập kho thành công", "added_quantity": payload.quantity}
 
 
 @product_router.patch("/wines/{wine_id}", response_model=WineDetailResponse)

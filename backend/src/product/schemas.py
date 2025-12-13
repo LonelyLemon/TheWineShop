@@ -125,3 +125,10 @@ class WineUpdate(BaseModel):
     
     images: Optional[List[str]] = None
     grapes: Optional[List[WineGrapeCreate]] = None
+
+# --- Inventory Schemas ---
+
+class InventoryImport(BaseModel):
+    quantity: int
+    import_price: float
+    batch_code: Optional[str] = None

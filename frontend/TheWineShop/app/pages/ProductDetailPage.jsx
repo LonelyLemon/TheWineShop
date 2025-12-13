@@ -7,6 +7,7 @@ import { useCart } from '../context/CartContext';
 
 const ProductDetailPage = () => {
   const { id } = useParams();
+  // eslint-disable-next-line no-unused-vars
   const navigate = useNavigate();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -29,11 +30,11 @@ const ProductDetailPage = () => {
   }, [id]);
 
   const handleAddToCart = async () => {
-    if (!localStorage.getItem('access_token')) {
-        toast.info("Vui lòng đăng nhập để mua hàng");
-        navigate('/login');
-        return;
-    }
+    // if (!localStorage.getItem('access_token')) {
+    //     toast.info("Vui lòng đăng nhập để mua hàng");
+    //     navigate('/login');
+    //     return;
+    // }
 
     setAdding(true);
     try {

@@ -4,8 +4,18 @@ import { toast } from 'react-toastify';
 const axiosClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL, 
   headers: {
+    'Content-Type': 'application/json',
   },
 });
+
+const getSessionId = () => {
+    let sessionId = localStorage.getItem('x-session-id');
+    if (!sessionId) {
+        sessionId = Math.random().toString(36).substring(2) + Date.now().toString(36);
+        localStorage.setItem('x-session-id', sessionId);
+    }
+    return sessionId;
+};
 
 axiosClient.interceptors.request.use(
   (config) => {
@@ -13,6 +23,9 @@ axiosClient.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    config.headers['x-session-id'] = getSessionId();
+
     return config;
   },
   (error) => Promise.reject(error)

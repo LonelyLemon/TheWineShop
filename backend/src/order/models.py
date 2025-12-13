@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, String, Integer, ForeignKey, Boolean, DECIMAL, DateTime, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
@@ -9,6 +9,7 @@ class Cart(Base):
     __tablename__ = "carts"
 
     user_id = Column(UUID(as_uuid=True), ForeignKey("user.id"), nullable=True)
+    session_id = Column(String(255), nullable=True, index=True)
     
     items = relationship("CartItem", back_populates="cart", cascade="all, delete-orphan")
     user = relationship("User")
@@ -20,6 +21,8 @@ class CartItem(Base):
     wine_id = Column(UUID(as_uuid=True), ForeignKey("wine_info.id"), nullable=False)
     
     quantity = Column(Integer, default=1)
+    
+    price_at_add = Column(DECIMAL(12, 2), nullable=False, default=0)
     
     cart = relationship("Cart", back_populates="items")
     wine = relationship("Wine")
@@ -37,6 +40,8 @@ class Order(Base):
     phone_number = Column(String(20), nullable=False)
     note = Column(Text, nullable=True)
     
+    created_at = Column(DateTime, default=datetime.now(timezone.utc))
+
     items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
     user = relationship("User")
 
