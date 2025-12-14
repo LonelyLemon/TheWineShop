@@ -74,18 +74,38 @@ class Wine(Base):
 
     # Foreign Keys
     category_id = Column(UUID(as_uuid=True), ForeignKey("category.id"), nullable=True)
-    winery_id = Column(UUID(as_uuid=True), ForeignKey("wineries.id"), nullable=True) # Thay thế country/region text cũ
+    winery_id = Column(UUID(as_uuid=True), ForeignKey("wineries.id"), nullable=True)
     
     # Relationships
     category = relationship("Category", back_populates="wines")
     winery = relationship("Winery", back_populates="wines")
     
-    # Quan hệ N-N với GrapeVariety thông qua bảng trung gian
     grape_composition = relationship("WineGrape", back_populates="wine", cascade="all, delete-orphan")
     
     images = relationship("WineImage", back_populates="wine", cascade="all, delete-orphan")
     inventory_items = relationship("Inventory", back_populates="wine")
     reviews = relationship("ProductReview", back_populates="wine")
+
+    @property
+    def thumbnail(self):
+        if self.images:
+            thumb = next((img for img in self.images if img.is_thumbnail), None)
+            if not thumb:
+                thumb = self.images[0]
+            return thumb.image_url
+        return None
+
+    @property
+    def winery_name(self):
+        return self.winery.name if self.winery else None
+
+    @property
+    def region_name(self):
+        return self.winery.region.name if self.winery and self.winery.region else None
+
+    @property
+    def wine_type(self):
+        return self.category.name if self.category else None
 
 
 class WineImage(Base):

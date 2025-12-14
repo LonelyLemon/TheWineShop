@@ -22,6 +22,7 @@ import AdminProductEditPage from './pages/admin/AdminProductEditPage';
 import AdminInventoryPage from './pages/admin/AdminInventoryPage';
 import AdminPromotionsPage from './pages/admin/AdminPromotionsPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
+import ProductsPage from './pages/ProductsPage';
 
 import './App.css';
 
@@ -37,6 +38,7 @@ function App() {
 
         <Route element={<MainLayout />}>
            <Route path="/" element={<HomePage />} />
+           <Route path="/products" element={<ProductsPage />} />
            <Route path="/products/:id" element={<ProductDetailPage />} />
            <Route path="/cart" element={<CartPage />} />
            <Route path="/checkout" element={<CheckoutPage />} />

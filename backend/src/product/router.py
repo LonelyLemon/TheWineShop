@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
-from sqlalchemy import func
+from sqlalchemy import func, asc, desc, or_
 
 from src.auth.dependencies import allow_staff, get_current_user
 from src.user.models import User
@@ -121,47 +121,58 @@ async def get_wines(
     db: SessionDep,
     skip: int = 0,
     limit: int = 10,
-    category_slug: Optional[str] = None,
+    category_id: Optional[UUID] = None,
+    wine_type: Optional[str] = None,
+    min_price: Optional[float] = None,
+    max_price: Optional[float] = None,
+    sort_by: Optional[str] = "newest",
     search: Optional[str] = None
 ):
-    query = select(Wine).options(
-        selectinload(Wine.category),
-        selectinload(Wine.images),
-        selectinload(Wine.winery).selectinload(Winery.region),
-    ).where(Wine.is_active == True)
-
-    if category_slug:
-        query = query.join(Category).where(Category.slug == category_slug)
+    query = select(Wine).where(Wine.is_active == True)
 
     if search:
-        query = query.where(Wine.name.ilike(f"%{search}%"))
+        search_term = f"%{search}%"
+        query = query.where(
+            or_(
+                Wine.name.ilike(search_term),
+                Wine.slug.ilike(search_term),
+                Wine.description.ilike(search_term)
+            )
+        )
 
-    query = query.order_by(Wine.created_at.desc()).offset(skip).limit(limit)
+    if category_id:
+        query = query.where(Wine.category_id == category_id)
+    
+    if wine_type:
+        query = query.where(Wine.wine_type == wine_type)
+    
+    if min_price is not None:
+        query = query.where(Wine.price >= min_price)
+    if max_price is not None:
+        query = query.where(Wine.price <= max_price)
+    
+    if sort_by == "price_asc":
+        query = query.order_by(asc(Wine.price))
+    elif sort_by == "price_desc":
+        query = query.order_by(desc(Wine.price))
+    elif sort_by == "name_asc":
+        query = query.order_by(asc(Wine.name))
+    else:
+        query = query.order_by(desc(Wine.created_at))
+
+    query = query.offset(skip).limit(limit)
+
+    query = query.options(
+        selectinload(Wine.images),
+        selectinload(Wine.category),
+        selectinload(Wine.reviews),
+        selectinload(Wine.winery).selectinload(Winery.region)
+    )
 
     result = await db.execute(query)
     wines = result.scalars().all()
 
-    response = []
-    for wine in wines:
-        thumb = None
-        if wine.images:
-            thumb_obj = next((img for img in wine.images if img.is_thumbnail), None)
-            if not thumb_obj: thumb_obj = wine.images[0]
-            thumb = thumb_obj.image_url
-
-        response.append(WineListResponse(
-            id=wine.id,
-            name=wine.name,
-            slug=wine.slug,
-            price=wine.price,
-            winery_name=wine.winery.name if wine.winery else None,
-            region_name=wine.winery.region.name if wine.winery and wine.winery.region else None,
-            wine_type=wine.category.name if wine.category else None,
-            thumbnail=thumb,
-            category=wine.category
-        ))
-
-    return response
+    return wines
 
 
 @product_router.get("/wines/{wine_id}", response_model=WineDetailResponse)

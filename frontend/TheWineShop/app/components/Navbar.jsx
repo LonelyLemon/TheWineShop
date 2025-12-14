@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
 import { toast } from 'react-toastify';
 import { useCart } from '../context/CartContext';
+import SearchBar from './SearchBar';
 import './Navbar.css';
 
 const Navbar = () => {
@@ -48,7 +49,7 @@ return (
           <li className="nav-item"><Link to="/" className="nav-links">Trang chủ</Link></li>
           <li className="nav-item"><Link to="/" className="nav-links">Sản phẩm</Link></li>
         </ul>
-
+        <SearchBar />
         <div className="nav-actions">
            <Link to="/cart" className="cart-icon">
               🛒 <span className="cart-count">{cartCount}</span>
