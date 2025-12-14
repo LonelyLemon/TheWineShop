@@ -64,6 +64,9 @@ class WineListResponse(BaseModel):
     region_name: str | None = None
     wine_type: str | None = None
     thumbnail: str | None = None
+
+    average_rating: float = 0 
+    review_count: int = 0
     
     category: Optional[CategoryBase] = None
 

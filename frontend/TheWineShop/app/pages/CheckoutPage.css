@@ -1,87 +1,189 @@
-.checkout-container {
-    max-width: 1000px;
-    margin: 2rem auto;
-    padding: 0 1rem;
+.checkout-page {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+    min-height: 80vh;
 }
 
-.checkout-wrapper {
+.checkout-title {
+    text-align: center;
+    margin-bottom: 2rem;
+    font-size: 2rem;
+    color: #333;
+}
+
+.checkout-container {
     display: flex;
-    gap: 3rem;
-    margin-top: 2rem;
+    gap: 2rem;
 }
 
 .checkout-form-section {
-    flex: 1.5;
-    background: white;
-    padding: 2rem;
-    border-radius: 8px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    flex: 2;
 }
 
-.checkout-summary-section {
-    flex: 1;
-    background: #fdfdfd;
-    padding: 2rem;
-    border: 1px solid #eee;
-    border-radius: 8px;
-    height: fit-content;
-}
-
-.checkout-form-section h3, .checkout-summary-section h3 {
-    margin-top: 0;
-    margin-bottom: 1.5rem;
+.section-head {
+    font-size: 1.2rem;
+    color: #800020;
+    margin-bottom: 1rem;
+    margin-top: 1.5rem;
     border-bottom: 1px solid #eee;
-    padding-bottom: 10px;
+    padding-bottom: 5px;
+}
+
+.section-head:first-child {
+    margin-top: 0;
 }
 
 .form-group {
-    margin-bottom: 1.2rem;
+    margin-bottom: 1rem;
 }
 
 .form-group label {
     display: block;
-    margin-bottom: 0.5rem;
+    margin-bottom: 5px;
     font-weight: 500;
 }
 
-.form-group input, .form-group textarea, .form-group select {
+.form-group input, 
+.form-group textarea {
     width: 100%;
-    padding: 10px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
     font-size: 1rem;
+    transition: border 0.2s;
 }
 
-.summary-item-row {
+.form-group input:focus,
+.form-group textarea:focus {
+    border-color: #800020;
+    outline: none;
+}
+
+/* Radio Cards (Shipping & Payment) */
+.radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.radio-card {
+    display: flex;
+    align-items: center;
+    border: 1px solid #ddd;
+    padding: 15px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.radio-card:hover {
+    background-color: #f9f9f9;
+}
+
+.radio-card.active {
+    border-color: #800020;
+    background-color: #fff0f5;
+}
+
+.radio-card input {
+    margin-right: 15px;
+    accent-color: #800020;
+    width: 20px;
+    height: 20px;
+}
+
+.radio-info {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 0.8rem;
+    width: 100%;
+    font-weight: 500;
+}
+
+.price-tag {
+    color: #800020;
+    font-weight: bold;
+}
+
+.checkout-summary-section {
+    flex: 1;
+}
+
+.order-summary-box {
+    background: #f8f8f8;
+    padding: 1.5rem;
+    border-radius: 8px;
+    border: 1px solid #eee;
+    position: sticky;
+    top: 20px;
+}
+
+.order-summary-box h3 {
+    margin-top: 0;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 10px;
+    margin-bottom: 1rem;
+}
+
+.summary-items-list {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-bottom: 1rem;
+}
+
+.summary-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    font-size: 0.9rem;
+}
+
+.summary-item-info {
+    display: flex;
+    gap: 8px;
+}
+
+.item-qty {
+    font-weight: bold;
+    color: #800020;
+}
+
+.summary-divider {
+    height: 1px;
+    background: #ddd;
+    margin: 1rem 0;
+}
+
+.summary-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
     color: #555;
-    font-size: 0.95rem;
 }
 
-.summary-total {
-    margin-top: 1.5rem;
-    padding-top: 1rem;
-    border-top: 2px solid #eee;
-    display: flex;
-    justify-content: space-between;
+.summary-row.total {
+    color: #333;
     font-weight: bold;
     font-size: 1.2rem;
+    margin-top: 5px;
+}
+
+.total-price {
     color: #800020;
 }
 
 .place-order-btn {
     width: 100%;
+    padding: 15px;
     background-color: #800020;
     color: white;
     border: none;
-    padding: 15px;
+    border-radius: 6px;
     font-size: 1.1rem;
-    border-radius: 4px;
-    cursor: pointer;
-    margin-top: 2rem;
     font-weight: bold;
+    margin-top: 1.5rem;
+    cursor: pointer;
+    transition: background 0.3s;
 }
 
 .place-order-btn:hover {
@@ -93,8 +195,22 @@
     cursor: not-allowed;
 }
 
+.back-to-cart {
+    display: block;
+    text-align: center;
+    margin-top: 1rem;
+    color: #666;
+    text-decoration: none;
+    font-size: 0.9rem;
+}
+.back-to-cart:hover {
+    text-decoration: underline;
+}
+
+/* Responsive */
 @media (max-width: 768px) {
-    .checkout-wrapper {
+    .checkout-container {
+        flex-direction: column-reverse;
         flex-direction: column;
     }
 }

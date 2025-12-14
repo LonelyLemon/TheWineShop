@@ -1,284 +1,258 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import axiosClient from '../api/axiosClient';
+import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import axiosClient from '../api/axiosClient';
+import { useCart } from '../context/CartContext';
 import './CheckoutPage.css';
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
-  const [cart, setCart] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-
-  const [couponCode, setCouponCode] = useState('');
-  const [discountInfo, setDiscountInfo] = useState({ amount: 0, appliedCode: null });
-  const [finalTotal, setFinalTotal] = useState(0);
-
-  const [shippingInfo, setShippingInfo] = useState({
-    address: '',
-    phone: '',
+  const { refreshCart } = useCart();
+  
+  const [formData, setFormData] = useState({
+    shipping_address: '',
+    phone_number: '',
     note: '',
-    payment_method: 'cod',
-    delivery_mode: 'regular'
+    delivery_mode: 'regular', 
+    payment_method: 'cod'
   });
 
-  const getShippingFee = (mode) => {
-    switch (mode) {
-        case 'express': return 50000;
-        case 'sea': return 20000;
-        default: return 30000;
-    }
-  };
+  const [cart, setCart] = useState(null);
+  const [simulation, setSimulation] = useState({
+    items_total: 0,
+    shipping_fee: 0,
+    discount_amount: 0,
+    final_total: 0
+  });
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const formatPrice = (val) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val);
 
   useEffect(() => {
-    const initData = async () => {
+    const fetchCart = async () => {
       try {
-        const cartRes = await axiosClient.get('/api/cart');
-        if (!cartRes.data.items || cartRes.data.items.length === 0) {
-            toast.info("Giỏ hàng trống");
-            navigate('/');
-            return;
+        const res = await axiosClient.get('/api/cart');
+        if (!res.data || !res.data.items || res.data.items.length === 0) {
+            navigate('/cart');
         }
-        setCart(cartRes.data);
-
-        try {
-            const userRes = await axiosClient.get('/api/users/me');
-            const u = userRes.data;
-            const fullAddress = [u.address_line_1, u.city, u.country].filter(Boolean).join(', ');
-            
-            setShippingInfo(prev => ({
-                ...prev,
-                address: fullAddress || '',
-                phone: u.phone_number || ''
-            }));
-        // eslint-disable-next-line no-unused-vars
-        } catch (e) {
-            // Chưa login
-        }
-
-        const fee = getShippingFee('regular');
-        setFinalTotal(cartRes.data.total_price + fee);
-
+        setCart(res.data);
       } catch (error) {
-         if (error.response?.status === 401) {
-             toast.warning("Vui lòng đăng nhập để thanh toán");
-             navigate('/login');
-         } else {
-             console.error(error);
-         }
+        console.error("Lỗi tải giỏ hàng", error);
+      }
+    };
+    fetchCart();
+  }, [navigate]);
+
+  useEffect(() => {
+    const simulateOrder = async () => {
+      setLoading(true);
+      try {
+        const res = await axiosClient.post('/api/cart/simulate', {
+            shipping_address: formData.shipping_address || "HCM",
+            phone_number: formData.phone_number || "0909090909",
+            delivery_mode: formData.delivery_mode,
+            payment_method: formData.payment_method,
+            coupon_code: null
+        });
+        setSimulation(res.data);
+      } catch (error) {
+        console.error("Lỗi tính toán đơn hàng", error);
       } finally {
         setLoading(false);
       }
     };
-    initData();
-  }, [navigate]);
 
-  const calculateTotal = async (code = null, currentDeliveryMode = null) => {
-      const mode = currentDeliveryMode || shippingInfo.delivery_mode;
-      
-      try {
-          const payload = {
-              shipping_address: shippingInfo.address || 'temp', 
-              phone_number: shippingInfo.phone || '000',
-              delivery_mode: mode,
-              coupon_code: code
-          };
-          
-          const res = await axiosClient.post('/api/cart/simulate', payload);
-          
-          setDiscountInfo({
-              amount: res.data.discount_amount,
-              appliedCode: res.data.coupon_applied
-          });
-          setFinalTotal(res.data.final_total);
-          
-          return res.data;
-      } catch (error) {
-          console.error("Lỗi tính giá:", error);
-          return null;
-      }
+    simulateOrder();
+  }, [formData.delivery_mode]);
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  useEffect(() => {
-      if (cart) {
-          calculateTotal(discountInfo.appliedCode || couponCode, shippingInfo.delivery_mode);
-      }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shippingInfo.delivery_mode]);
-
-  const handleApplyCoupon = async () => {
-      if (!couponCode.trim()) return;
-      
-      const res = await calculateTotal(couponCode, shippingInfo.delivery_mode);
-      
-      if (res && res.coupon_applied) {
-          toast.success(`Đã áp dụng mã: ${res.coupon_applied}`);
-      } else {
-          toast.error("Mã giảm giá không hợp lệ hoặc không đủ điều kiện");
-          setDiscountInfo({ amount: 0, appliedCode: null });
-          calculateTotal(null, shippingInfo.delivery_mode);
-      }
-  };
-
-  const handleOrder = async () => {
-    if (!shippingInfo.address || !shippingInfo.phone) {
-        toast.warning("Vui lòng nhập địa chỉ và số điện thoại");
-        return;
-    }
-
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     setSubmitting(true);
-    try {
-      const payload = {
-          shipping_address: shippingInfo.address,
-          phone_number: shippingInfo.phone,
-          note: shippingInfo.note,
-          payment_method: shippingInfo.payment_method,
-          delivery_mode: shippingInfo.delivery_mode,
-          coupon_code: discountInfo.appliedCode
-      };
 
-      await axiosClient.post('/api/cart/orders', payload);
-      toast.success("Đặt hàng thành công!");
-      navigate('/orders');
+    try {
+        const res = await axiosClient.post('/api/cart/orders', formData);
+        
+        toast.success("Đặt hàng thành công! Mã đơn: " + res.data.id.slice(0,8));
+        
+        refreshCart();
+        
+        navigate('/orders'); 
+
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Lỗi đặt hàng");
+        console.error(error);
+        toast.error(error.response?.data?.detail || "Đặt hàng thất bại, vui lòng thử lại.");
     } finally {
-      setSubmitting(false);
+        setSubmitting(false);
     }
   };
 
-  if (loading) return <div className="loading-container">Đang tải...</div>;
-
-  const currentShippingFee = getShippingFee(shippingInfo.delivery_mode);
+  if (!cart) return <div className="checkout-loading">Đang tải thông tin...</div>;
 
   return (
-    <div className="checkout-container">
-      <h1>Thanh toán</h1>
-      
-      <div className="checkout-grid">
-        <div className="checkout-form">
-            <h3>Thông tin giao hàng</h3>
-            <div className="form-group">
-                <label>Địa chỉ nhận hàng</label>
-                <input 
-                    type="text" 
-                    value={shippingInfo.address}
-                    onChange={(e) => setShippingInfo({...shippingInfo, address: e.target.value})}
-                    placeholder="Số nhà, đường, phường/xã..."
-                />
-            </div>
-            <div className="form-group">
-                <label>Số điện thoại</label>
-                <input 
-                    type="text" 
-                    value={shippingInfo.phone}
-                    onChange={(e) => setShippingInfo({...shippingInfo, phone: e.target.value})}
-                />
-            </div>
-            
-            <div className="form-group">
-                <label>Phương thức vận chuyển</label>
-                <div className="delivery-options">
-                    <label className={`delivery-option ${shippingInfo.delivery_mode === 'regular' ? 'selected' : ''}`}>
+    <div className="checkout-page">
+      <h1 className="checkout-title">Thanh Toán</h1>
+
+      <div className="checkout-container">
+        <div className="checkout-form-section">
+            <form id="checkout-form" onSubmit={handleSubmit}>
+                <h3 className="section-head">📍 Thông tin giao hàng</h3>
+                
+                <div className="form-group">
+                    <label>Địa chỉ nhận hàng *</label>
+                    <input 
+                        type="text" 
+                        name="shipping_address"
+                        value={formData.shipping_address}
+                        onChange={handleChange}
+                        placeholder="Số nhà, tên đường, phường, quận..."
+                        required 
+                    />
+                </div>
+
+                <div className="form-group">
+                    <label>Số điện thoại *</label>
+                    <input 
+                        type="text" 
+                        name="phone_number" 
+                        value={formData.phone_number}
+                        onChange={handleChange}
+                        placeholder="Ví dụ: 0987654321"
+                        required
+                    />
+                </div>
+
+                <div className="form-group">
+                    <label>Ghi chú đơn hàng (Tùy chọn)</label>
+                    <textarea 
+                        name="note" 
+                        value={formData.note}
+                        onChange={handleChange}
+                        placeholder="Ví dụ: Giao giờ hành chính..."
+                    />
+                </div>
+
+                <h3 className="section-head">🚚 Vận chuyển</h3>
+                <div className="radio-group">
+                    <label className={`radio-card ${formData.delivery_mode === 'regular' ? 'active' : ''}`}>
                         <input 
                             type="radio" 
-                            name="delivery" 
-                            value="regular"
-                            checked={shippingInfo.delivery_mode === 'regular'}
-                            onChange={(e) => setShippingInfo({...shippingInfo, delivery_mode: e.target.value})}
+                            name="delivery_mode" 
+                            value="regular" 
+                            checked={formData.delivery_mode === 'regular'}
+                            onChange={handleChange}
                         />
-                        <span>Tiêu chuẩn (30k)</span>
+                        <div className="radio-info">
+                            <span>Giao hàng tiêu chuẩn (3-4 ngày)</span>
+                            <span className="price-tag">30.000 ₫</span>
+                        </div>
                     </label>
-                    <label className={`delivery-option ${shippingInfo.delivery_mode === 'express' ? 'selected' : ''}`}>
+
+                    <label className={`radio-card ${formData.delivery_mode === 'express' ? 'active' : ''}`}>
                         <input 
                             type="radio" 
-                            name="delivery" 
-                            value="express"
-                            checked={shippingInfo.delivery_mode === 'express'}
-                            onChange={(e) => setShippingInfo({...shippingInfo, delivery_mode: e.target.value})}
+                            name="delivery_mode" 
+                            value="express" 
+                            checked={formData.delivery_mode === 'express'}
+                            onChange={handleChange}
                         />
-                        <span>Hỏa tốc (50k)</span>
-                    </label>
-                    <label className={`delivery-option ${shippingInfo.delivery_mode === 'sea' ? 'selected' : ''}`}>
-                        <input 
-                            type="radio" 
-                            name="delivery" 
-                            value="sea"
-                            checked={shippingInfo.delivery_mode === 'sea'}
-                            onChange={(e) => setShippingInfo({...shippingInfo, delivery_mode: e.target.value})}
-                        />
-                        <span>Đường biển (20k)</span>
+                        <div className="radio-info">
+                            <span>Giao hàng hỏa tốc (24h)</span>
+                            <span className="price-tag">50.000 ₫</span>
+                        </div>
                     </label>
                 </div>
-            </div>
 
-            <div className="form-group">
-                <label>Ghi chú</label>
-                <textarea 
-                    value={shippingInfo.note}
-                    onChange={(e) => setShippingInfo({...shippingInfo, note: e.target.value})}
-                />
-            </div>
+                <h3 className="section-head">💳 Thanh toán</h3>
+                <div className="radio-group">
+                    <label className={`radio-card ${formData.payment_method === 'cod' ? 'active' : ''}`}>
+                        <input 
+                            type="radio" 
+                            name="payment_method" 
+                            value="cod" 
+                            checked={formData.payment_method === 'cod'}
+                            onChange={handleChange}
+                        />
+                        <div className="radio-info">
+                            <span>Thanh toán khi nhận hàng (COD)</span>
+                        </div>
+                    </label>
+
+                    <label className={`radio-card ${formData.payment_method === 'banking' ? 'active' : ''}`}>
+                        <input 
+                            type="radio" 
+                            name="payment_method" 
+                            value="banking" 
+                            checked={formData.payment_method === 'banking'}
+                            onChange={handleChange}
+                        />
+                        <div className="radio-info">
+                            <span>Chuyển khoản ngân hàng</span>
+                        </div>
+                    </label>
+                </div>
+
+            </form>
         </div>
 
-        <div className="order-summary">
-            <h3>Đơn hàng của bạn</h3>
-            <div className="summary-items">
-                {cart && cart.items.map(item => (
-                    <div key={item.id} className="summary-item">
-                        <span>{item.wine.name} (x{item.quantity})</span>
-                        <span>{new Intl.NumberFormat('vi-VN').format(item.subtotal)} đ</span>
-                    </div>
-                ))}
-            </div>
-            <div className="summary-divider"></div>
-            
-            <div className="coupon-section" style={{display: 'flex', gap: '5px', marginBottom: '15px'}}>
-                <input 
-                    type="text" 
-                    placeholder="Mã giảm giá" 
-                    value={couponCode}
-                    onChange={(e) => setCouponCode(e.target.value)}
-                    style={{flex: 1, padding: '8px', border: '1px solid #ddd', borderRadius: '4px'}}
-                />
-                <button 
-                    onClick={handleApplyCoupon}
-                    style={{padding: '8px 15px', background: '#333', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer'}}
-                >
-                    Áp dụng
-                </button>
-            </div>
-
-            <div className="summary-row">
-                <span>Tạm tính:</span>
-                <span>{cart ? new Intl.NumberFormat('vi-VN').format(cart.total_price) : 0} đ</span>
-            </div>
-            <div className="summary-row">
-                <span>Phí vận chuyển:</span>
-                <span>{new Intl.NumberFormat('vi-VN').format(currentShippingFee)} đ</span>
-            </div>
-
-            {discountInfo.amount > 0 && (
-                <div className="summary-row" style={{color: 'green', fontWeight: 'bold'}}>
-                    <span>Giảm giá ({discountInfo.appliedCode}):</span>
-                    <span>- {new Intl.NumberFormat('vi-VN').format(discountInfo.amount)} đ</span>
+        <div className="checkout-summary-section">
+            <div className="order-summary-box">
+                <h3>Đơn hàng ({cart.items.length} sản phẩm)</h3>
+                
+                <div className="summary-items-list">
+                    {cart.items.map(item => (
+                        <div key={item.id} className="summary-item">
+                            <div className="summary-item-info">
+                                <span className="item-qty">{item.quantity}x</span>
+                                <span className="item-name">{item.wine.name}</span>
+                            </div>
+                            <span className="item-price">{formatPrice(item.subtotal)}</span>
+                        </div>
+                    ))}
                 </div>
-            )}
-            
-            <div className="summary-divider"></div>
 
-            <div className="summary-row total">
-                <span>Tổng cộng:</span>
-                <span>{new Intl.NumberFormat('vi-VN').format(finalTotal)} đ</span>
+                <div className="summary-divider"></div>
+
+                <div className="summary-row">
+                    <span>Tạm tính:</span>
+                    <span>{formatPrice(simulation.items_total)}</span>
+                </div>
+                <div className="summary-row">
+                    <span>Phí vận chuyển:</span>
+                    <span>{formatPrice(simulation.shipping_fee)}</span>
+                </div>
+                
+                {simulation.discount_amount > 0 && (
+                     <div className="summary-row discount">
+                        <span>Giảm giá:</span>
+                        <span>-{formatPrice(simulation.discount_amount)}</span>
+                    </div>
+                )}
+
+                <div className="summary-divider"></div>
+
+                <div className="summary-row total">
+                    <span>Tổng cộng:</span>
+                    <span className="total-price">{formatPrice(simulation.final_total)}</span>
+                </div>
+
+                <button 
+                    type="submit" 
+                    form="checkout-form"
+                    className="place-order-btn"
+                    disabled={loading || submitting}
+                >
+                    {submitting ? "Đang xử lý..." : "ĐẶT HÀNG"}
+                </button>
+
+                <Link to="/cart" className="back-to-cart">
+                    ← Quay lại giỏ hàng
+                </Link>
             </div>
-
-            <button 
-                className="confirm-btn"
-                onClick={handleOrder}
-                disabled={submitting}
-            >
-                {submitting ? 'Đang xử lý...' : 'ĐẶT HÀNG'}
-            </button>
         </div>
       </div>
     </div>

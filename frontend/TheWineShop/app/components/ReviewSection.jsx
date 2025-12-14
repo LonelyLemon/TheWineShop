@@ -1,119 +1,108 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import axiosClient from '../api/axiosClient';
+import React, { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
+import axiosClient from '../api/axiosClient';
 import './ReviewSection.css';
 
-const ReviewSection = ({ wineId }) => {
-    const [reviews, setReviews] = useState([]);
-    const [loading, setLoading] = useState(true);
-    
-    const [rating, setRating] = useState(5);
-    const [comment, setComment] = useState('');
-    const [submitting, setSubmitting] = useState(false);
-    const [user, setUser] = useState(null);
+const ReviewSection = ({ wineId, user }) => {
+  const [reviews, setReviews] = useState([]);
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-    const checkUser = () => {
-        const token = localStorage.getItem('access_token');
-        if (token) setUser(true);
-    };
+  const fetchReviews = async () => {
+    try {
+      const res = await axiosClient.get(`/api/products/wines/${wineId}/reviews`);
+      setReviews(res.data);
+    } catch (error) {
+      console.error("Lỗi tải đánh giá", error);
+    }
+  };
 
-    const fetchReviews = useCallback(async () => {
-        try {
-            const res = await axiosClient.get(`/api/products/wines/${wineId}/reviews`);
-            setReviews(res.data);
-        } catch (error) {
-            console.error(error);
-        } finally {
-            setLoading(false);
-        }
-    }, [wineId]);
+  useEffect(() => {
+    fetchReviews();
+  }, [wineId]);
 
-    useEffect(() => {
-        fetchReviews();
-        checkUser();
-    }, [fetchReviews]);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!user) {
+        toast.info("Vui lòng đăng nhập để đánh giá");
+        return;
+    }
+    setSubmitting(true);
+    try {
+      await axiosClient.post(`/api/products/wines/${wineId}/reviews`, {
+        rating,
+        comment
+      });
+      toast.success("Cảm ơn bạn đã đánh giá!");
+      setComment('');
+      setRating(5);
+      fetchReviews();
+    // eslint-disable-next-line no-unused-vars
+    } catch (error) {
+      toast.error("Gửi đánh giá thất bại (Có thể bạn đã đánh giá rồi?)");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (!user) {
-            toast.info("Vui lòng đăng nhập để đánh giá");
-            return;
-        }
-        setSubmitting(true);
-        try {
-            await axiosClient.post(`/api/products/wines/${wineId}/reviews`, {
-                rating,
-                comment
-            });
-            toast.success("Cảm ơn đánh giá của bạn!");
-            setComment('');
-            setRating(5);
-            fetchReviews();
-        // eslint-disable-next-line no-unused-vars
-        } catch (error) {
-            toast.error("Lỗi gửi đánh giá");
-        } finally {
-            setSubmitting(false);
-        }
-    };
+  return (
+    <div className="review-section">
+      <h3 className="review-title">Đánh giá sản phẩm ({reviews.length})</h3>
 
-    const renderStars = (num) => {
-        return "⭐".repeat(num);
-    };
-
-    return (
-        <div className="review-section">
-            <h3>Đánh giá khách hàng ({reviews.length})</h3>
-
-            <div className="review-list">
-                {loading ? <p>Đang tải...</p> : (
-                    reviews.length === 0 ? <p className="no-reviews">Chưa có đánh giá nào. Hãy là người đầu tiên!</p> :
-                    reviews.map(r => (
-                        <div key={r.id} className="review-item">
-                            <div className="review-header">
-                                <strong>{r.user_name}</strong>
-                                <span className="review-date">{new Date(r.created_at).toLocaleDateString('vi-VN')}</span>
-                            </div>
-                            <div className="review-rating">{renderStars(r.rating)}</div>
-                            <p className="review-comment">{r.comment}</p>
-                        </div>
-                    ))
-                )}
-            </div>
-
-            <div className="review-form-container">
-                <h4>Viết đánh giá của bạn</h4>
-                {!user ? (
-                    <p><a href="/login">Đăng nhập</a> để viết đánh giá.</p>
-                ) : (
-                    <form onSubmit={handleSubmit} className="review-form">
-                        <div className="form-group">
-                            <label>Mức độ hài lòng:</label>
-                            <select value={rating} onChange={(e) => setRating(parseInt(e.target.value))}>
-                                <option value="5">5 sao - Tuyệt vời</option>
-                                <option value="4">4 sao - Rất tốt</option>
-                                <option value="3">3 sao - Bình thường</option>
-                                <option value="2">2 sao - Tệ</option>
-                                <option value="1">1 sao - Rất tệ</option>
-                            </select>
-                        </div>
-                        <div className="form-group">
-                            <textarea 
-                                rows="3" 
-                                placeholder="Chia sẻ cảm nhận của bạn về hương vị..."
-                                value={comment}
-                                onChange={(e) => setComment(e.target.value)}
-                                required
-                            ></textarea>
-                        </div>
-                        <button type="submit" disabled={submitting}>
-                            {submitting ? 'Đang gửi...' : 'Gửi đánh giá'}
+      <div className="review-form-container">
+        {user ? (
+            <form onSubmit={handleSubmit} className="review-form">
+                <div className="rating-select">
+                    <span>Chọn đánh giá: </span>
+                    {[1, 2, 3, 4, 5].map(star => (
+                        <button 
+                            key={star} 
+                            type="button" 
+                            className={`star-btn ${star <= rating ? 'active' : ''}`}
+                            onClick={() => setRating(star)}
+                        >
+                            ★
                         </button>
-                    </form>
-                )}
+                    ))}
+                </div>
+                <textarea 
+                    className="review-input"
+                    placeholder="Viết cảm nhận của bạn về loại rượu này..."
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    required
+                />
+                <button type="submit" className="submit-review-btn" disabled={submitting}>
+                    {submitting ? "Đang gửi..." : "Gửi đánh giá"}
+                </button>
+            </form>
+        ) : (
+            <div className="login-prompt">
+                Vui lòng <a href="/login">đăng nhập</a> để viết đánh giá.
             </div>
-        </div>
-    );
+        )}
+      </div>
+
+      <div className="review-list">
+        {reviews.length === 0 && <p className="no-reviews">Chưa có đánh giá nào.</p>}
+        {reviews.map(review => (
+            <div key={review.id} className="review-item">
+                <div className="review-header">
+                    <span className="reviewer-name">{review.user_name}</span>
+                    <span className="review-date">
+                        {new Date(review.created_at).toLocaleDateString('vi-VN')}
+                    </span>
+                </div>
+                <div className="review-stars">
+                    {"★".repeat(review.rating)}{"☆".repeat(5 - review.rating)}
+                </div>
+                <p className="review-content">{review.comment}</p>
+            </div>
+        ))}
+      </div>
+    </div>
+  );
 };
 
 export default ReviewSection;

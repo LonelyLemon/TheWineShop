@@ -106,6 +106,17 @@ class Wine(Base):
     @property
     def wine_type(self):
         return self.category.name if self.category else None
+    
+    @property
+    def average_rating(self):
+        if not self.reviews:
+            return 0
+        total = sum(r.rating for r in self.reviews)
+        return round(total / len(self.reviews), 1)
+
+    @property
+    def review_count(self):
+        return len(self.reviews) if self.reviews else 0
 
 
 class WineImage(Base):

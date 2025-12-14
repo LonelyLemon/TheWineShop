@@ -13,7 +13,7 @@ from src.auth.dependencies import get_current_user
 from src.auth.security import decode_token
 from src.user.models import User
 from src.order.models import Cart, CartItem, Order, OrderItem
-from src.product.models import Wine, Inventory
+from src.product.models import Wine, Inventory, Winery
 from src.order.schemas import CartResponse, CartItemCreate, OrderCreate, OrderResponse, OrderSimulateResponse
 from src.product.schemas import CategoryBase, WineListResponse
 from src.order.discount_service import discount_service
@@ -293,8 +293,11 @@ async def create_order(
 
     query = select(Order).options(
         selectinload(Order.items).selectinload(OrderItem.wine).selectinload(Wine.images),
-        selectinload(Order.items).selectinload(OrderItem.wine).selectinload(Wine.category)
+        selectinload(Order.items).selectinload(OrderItem.wine).selectinload(Wine.category),
+        selectinload(Order.items).selectinload(OrderItem.wine).selectinload(Wine.reviews),
+        selectinload(Order.items).selectinload(OrderItem.wine).selectinload(Wine.winery).selectinload(Winery.region)
     ).where(Order.id == new_order.id)
+
     result = await db.execute(query)
     return result.scalar_one()
 
@@ -306,7 +309,9 @@ async def get_my_orders(
 ):
     query = select(Order).options(
         selectinload(Order.items).selectinload(OrderItem.wine).selectinload(Wine.images),
-        selectinload(Order.items).selectinload(OrderItem.wine).selectinload(Wine.category)
+        selectinload(Order.items).selectinload(OrderItem.wine).selectinload(Wine.category),
+        selectinload(Order.items).selectinload(OrderItem.wine).selectinload(Wine.reviews),
+        selectinload(Order.items).selectinload(OrderItem.wine).selectinload(Wine.winery).selectinload(Winery.region)
     ).where(Order.user_id == current_user.id).order_by(Order.created_at.desc())
     
     result = await db.execute(query)

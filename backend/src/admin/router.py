@@ -11,7 +11,7 @@ from src.user.models import User
 from src.user.schemas import UserResponse
 from src.auth.dependencies import allow_staff, allow_admin
 from src.order.models import Order, OrderItem
-from src.product.models import Inventory, Wine
+from src.product.models import Inventory, Wine, Winery
 from src.order.schemas import OrderResponse
 
 
@@ -38,7 +38,9 @@ async def get_all_orders(
 ):
     query = select(Order).options(
         selectinload(Order.items).selectinload(OrderItem.wine).selectinload(Wine.images),
-        selectinload(Order.items).selectinload(OrderItem.wine).selectinload(Wine.category)
+        selectinload(Order.items).selectinload(OrderItem.wine).selectinload(Wine.category),
+        selectinload(Order.items).selectinload(OrderItem.wine).selectinload(Wine.reviews),
+        selectinload(Order.items).selectinload(OrderItem.wine).selectinload(Wine.winery).selectinload(Winery.region)
     ).order_by(Order.created_at.desc())
     
     result = await db.execute(query)

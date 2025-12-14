@@ -1,118 +1,162 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
-import { toast } from 'react-toastify';
-import './ProductDetailPage.css';
 import { useCart } from '../context/CartContext';
+import { toast } from 'react-toastify';
 import ReviewSection from '../components/ReviewSection';
+import ProductCard from '../components/ProductCard';
+import './ProductDetailPage.css';
 
 const ProductDetailPage = () => {
   const { id } = useParams();
-  // eslint-disable-next-line no-unused-vars
-  const navigate = useNavigate();
-  const [product, setProduct] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [adding, setAdding] = useState(false);
   const { refreshCart } = useCart();
+  
+  const [wine, setWine] = useState(null);
+  const [relatedWines, setRelatedWines] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [quantity, setQuantity] = useState(1);
+  const [currentUser, setCurrentUser] = useState(null);
+  
+  const formatPrice = (price) => 
+    new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
 
   useEffect(() => {
-    const fetchDetail = async () => {
+    const fetchUser = async () => {
+        try {
+            const res = await axiosClient.get('/api/users/me');
+            setCurrentUser(res.data);
+        // eslint-disable-next-line no-unused-vars
+        } catch (e) { 
+          /* Chưa login */ 
+        }
+    };
+    fetchUser();
+  }, []);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
       try {
-        const response = await axiosClient.get(`/api/products/wines/${id}`);
-        setProduct(response.data);
-      // eslint-disable-next-line no-unused-vars
+        const res = await axiosClient.get(`/api/products/wines/${id}`);
+        setWine(res.data);
+        
+        if (res.data.category) {
+            const relatedRes = await axiosClient.get(
+                `/api/products/wines?category_id=${res.data.category.id}&limit=4`
+            );
+            setRelatedWines(relatedRes.data.filter(w => w.id !== res.data.id).slice(0, 4));
+        }
       } catch (error) {
-        toast.error("Không tìm thấy sản phẩm!");
+        console.error("Lỗi tải chi tiết sản phẩm", error);
       } finally {
         setLoading(false);
       }
     };
-    fetchDetail();
+    fetchData();
+    window.scrollTo(0, 0);
   }, [id]);
 
   const handleAddToCart = async () => {
-    // if (!localStorage.getItem('access_token')) {
-    //     toast.info("Vui lòng đăng nhập để mua hàng");
-    //     navigate('/login');
-    //     return;
-    // }
-
-    setAdding(true);
     try {
         await axiosClient.post('/api/cart/items', {
-            wine_id: product.id,
-            quantity: 1
+            wine_id: wine.id,
+            quantity: quantity
         });
-        toast.success("Đã thêm vào giỏ hàng!");
-
+        toast.success(`Đã thêm ${quantity} chai vào giỏ hàng!`);
         refreshCart();
-        
+    // eslint-disable-next-line no-unused-vars
     } catch (error) {
-        console.error(error);
-        toast.error("Có lỗi xảy ra khi thêm vào giỏ");
-    } finally {
-        setAdding(false);
+        toast.error("Lỗi thêm vào giỏ hàng");
     }
   };
 
-  if (loading) return <div className="loading-container">Đang tải...</div>;
-  if (!product) return <div className="error-container">Sản phẩm không tồn tại.</div>;
-
-  const price = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(product.price);
-
-  const grapeList = product.grapes && product.grapes.length > 0 
-    ? product.grapes.map(g => `${g.grape_variety.name} (${g.percentage}%)`).join(', ')
-    : 'Chưa cập nhật';
+  if (loading) return <div className="loading-container">Đang tải sản phẩm...</div>;
+  if (!wine) return <div className="error-container">Không tìm thấy sản phẩm!</div>;
 
   return (
-    <div className="container product-detail-page">
-      <Link to="/" className="back-link">← Quay lại trang chủ</Link>
-      
-      <div className="detail-wrapper">
-        <div className="detail-images">
-          <div className="main-image">
-            <img 
-              src={product.images.length > 0 ? product.images[0].image_url : "https://via.placeholder.com/500x600"} 
-              alt={product.name} 
-            />
-          </div>
+    <div className="product-detail-page">
+        <div className="detail-container">
+            <div className="detail-image-box">
+                <img 
+                    src={wine.images?.[0]?.image_url || "https://via.placeholder.com/400x600"} 
+                    alt={wine.name} 
+                    className="detail-image"
+                />
+            </div>
+
+            <div className="detail-info-box">
+                <div className="detail-breadcrumbs">
+                    <Link to="/products">Sản phẩm</Link> / <span>{wine.category?.name}</span>
+                </div>
+                
+                <h1 className="detail-title">{wine.name}</h1>
+                
+                <div className="detail-meta">
+                    <span className="meta-item">Nhà sản xuất: <strong>{wine.winery?.name}</strong></span>
+                    <span className="meta-item">Vùng: <strong>{wine.winery?.region?.name}</strong></span>
+                </div>
+
+                <div className="detail-price">{formatPrice(wine.price)}</div>
+
+                <p className="detail-description">{wine.description}</p>
+
+                <div className="specs-grid">
+                    <div className="spec-item">
+                        <span className="spec-label">Độ cồn</span>
+                        <span className="spec-value">{wine.alcohol_percentage}%</span>
+                    </div>
+                    <div className="spec-item">
+                        <span className="spec-label">Dung tích</span>
+                        <span className="spec-value">{wine.volume} ml</span>
+                    </div>
+                    <div className="spec-item">
+                        <span className="spec-label">Niên vụ</span>
+                        <span className="spec-value">{wine.vintage}</span>
+                    </div>
+                    <div className="spec-item">
+                        <span className="spec-label">Giống nho</span>
+                        <span className="spec-value">
+                            {wine.grapes?.map(g => g.grape_variety.name).join(', ') || 'N/A'}
+                        </span>
+                    </div>
+                </div>
+
+                <div className="detail-actions">
+                    <div className="quantity-control">
+                        <button onClick={() => setQuantity(Math.max(1, quantity - 1))}>-</button>
+                        <input type="number" value={quantity} readOnly />
+                        <button onClick={() => setQuantity(quantity + 1)}>+</button>
+                    </div>
+                    
+                    <button 
+                        className="add-to-cart-btn-large"
+                        onClick={handleAddToCart}
+                        disabled={wine.inventory_quantity <= 0}
+                    >
+                        {wine.inventory_quantity > 0 ? "THÊM VÀO GIỎ HÀNG" : "TẠM HẾT HÀNG"}
+                    </button>
+                </div>
+                
+                <div className="stock-status">
+                    {wine.inventory_quantity > 0 
+                        ? `✅ Còn hàng (${wine.inventory_quantity} sản phẩm)` 
+                        : "❌ Hết hàng"}
+                </div>
+            </div>
         </div>
 
-        <div className="detail-info">
-          <h1 className="detail-name">{product.name}</h1>
-          <div className="detail-meta">
-            <span> Nhà sản xuất: <strong>{product.winery?.name}</strong></span> | 
-            <span> Vùng: <strong>{product.winery?.region?.name}</strong></span> |
-            <span> Niên vụ: <strong>{product.vintage}</strong></span>
-          </div>
-          
-          <div className="detail-price">{price}</div>
-          
-          <div className="detail-description">
-            <h3>Mô tả hương vị</h3>
-            <p>{product.description}</p>
-          </div>
+        <ReviewSection wineId={wine.id} user={currentUser} />
 
-          <div className="detail-specs">
-            <p><strong>Giống nho:</strong> {grapeList}</p>
-            <p><strong>Nồng độ:</strong> {product.alcohol_percentage}%</p>
-            <p><strong>Dung tích:</strong> {product.volume}ml</p>
-            <p><strong>Loại vang:</strong> {product.category?.name}</p>
-            <p><strong>Tồn kho:</strong> {product.inventory_quantity > 0 ? 'Còn hàng' : 'Hết hàng'}</p>
-          </div>
-
-          <div className="detail-actions">
-            <button 
-                className="add-to-cart-btn" 
-                disabled={product.inventory_quantity === 0 || adding}
-                onClick={handleAddToCart}
-            >
-              {adding ? 'Đang xử lý...' : (product.inventory_quantity > 0 ? 'Thêm vào giỏ hàng' : 'Hết hàng')}
-            </button>
-          </div>
-        </div>
-      </div>
-      <ReviewSection wineId={id} />
+        {relatedWines.length > 0 && (
+            <div className="related-products-section">
+                <h2 className="section-title">Sản phẩm tương tự</h2>
+                <div className="product-grid">
+                    {relatedWines.map(w => (
+                        <ProductCard key={w.id} product={w} />
+                    ))}
+                </div>
+            </div>
+        )}
     </div>
   );
 };
