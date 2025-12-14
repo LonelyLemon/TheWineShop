@@ -119,11 +119,17 @@ class Promotion(Base):
     __tablename__ = "promotions"
     
     name = Column(String(255), nullable=False)
+    code = Column(String(50), unique=True, nullable=True)
     description = Column(Text, nullable=True)
-    discount_percentage = Column(DECIMAL(5, 2), nullable=True)
+
+    discount_percentage = Column(DECIMAL(5, 2), nullable=False)
+
     start_date = Column(DateTime, nullable=False)
     end_date = Column(DateTime, nullable=False)
     is_active = Column(Boolean, default=True)
+
+    trigger_type = Column(String(50), nullable=False, default="period")
+    min_quantity = Column(Integer, default=0)
 
 
 class ProductReview(Base):

@@ -10,7 +10,7 @@ from sqlalchemy import func
 from src.auth.dependencies import allow_staff
 from src.user.models import User
 from src.core.database import SessionDep
-from src.product.models import Wine, Category, WineImage, Inventory, Region, Winery, GrapeVariety, WineGrape
+from src.product.models import Wine, Category, WineImage, Inventory, Region, Winery, GrapeVariety, WineGrape, Promotion
 from src.product.schemas import (
     WineListResponse, 
     WineDetailResponse, 
@@ -20,7 +20,10 @@ from src.product.schemas import (
     RegionBase,
     WineryBase,
     GrapeVarietyBase,
-    InventoryImport
+    InventoryImport,
+    PromotionCreate, 
+    PromotionUpdate, 
+    PromotionResponse
 )
 
 product_router = APIRouter(
@@ -325,3 +328,74 @@ async def delete_wine(
     await db.commit()
 
     return {"message": "Sản phẩm đã được ẩn"}
+
+
+# ---------------------------------------------------------
+# 3. PROMOTION MANAGEMENT (ADMIN)
+# ---------------------------------------------------------
+
+@product_router.get("/promotions", response_model=List[PromotionResponse])
+async def get_promotions(db: SessionDep):
+    result = await db.execute(select(Promotion).order_by(Promotion.start_date.desc()))
+    return result.scalars().all()
+
+@product_router.post("/promotions", response_model=PromotionResponse)
+async def create_promotion(
+    payload: PromotionCreate,
+    db: SessionDep,
+    user: User = Depends(allow_staff)
+):
+    if payload.end_date <= payload.start_date:
+        raise HTTPException(status_code=400, detail="Ngày kết thúc phải sau ngày bắt đầu")
+    
+    if payload.code:
+        existing = await db.execute(select(Promotion).where(Promotion.code == payload.code))
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="Mã khuyến mãi đã tồn tại")
+
+    new_promo = Promotion(
+        name=payload.name,
+        code=payload.code.upper() if payload.code else None,
+        description=payload.description,
+        discount_percentage=payload.discount_percentage,
+        start_date=payload.start_date,
+        end_date=payload.end_date,
+        is_active=payload.is_active,
+        trigger_type=payload.trigger_type,
+        min_quantity=payload.min_quantity
+    )
+    
+    db.add(new_promo)
+    await db.commit()
+    await db.refresh(new_promo)
+    return new_promo
+
+
+@product_router.delete("/promotions/{promo_id}")
+async def delete_promotion(
+    promo_id: UUID,
+    db: SessionDep,
+    user: User = Depends(allow_staff)
+):
+    promo = await db.get(Promotion, promo_id)
+    if not promo:
+        raise HTTPException(status_code=404, detail="Không tìm thấy khuyến mãi")
+        
+    await db.delete(promo)
+    await db.commit()
+    return {"message": "Đã xóa khuyến mãi"}
+
+
+@product_router.patch("/promotions/{promo_id}/toggle")
+async def toggle_promotion(
+    promo_id: UUID,
+    db: SessionDep,
+    user: User = Depends(allow_staff)
+):
+    promo = await db.get(Promotion, promo_id)
+    if not promo:
+        raise HTTPException(status_code=404, detail="Không tìm thấy khuyến mãi")
+    
+    promo.is_active = not promo.is_active
+    await db.commit()
+    return {"message": "Đã đổi trạng thái", "is_active": promo.is_active}

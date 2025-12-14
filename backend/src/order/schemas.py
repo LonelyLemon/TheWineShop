@@ -41,6 +41,8 @@ class OrderCreate(BaseModel):
 
     payment_method: str = "cod"
     delivery_mode: str = "regular"
+
+    coupon_code: Optional[str] = None
     
 
 class OrderItemResponse(BaseModel):
@@ -61,6 +63,8 @@ class OrderResponse(BaseModel):
     delivery_mode: str
     delivery_cost: float
 
+    discount_amount: Optional[float] = 0.0
+
     payment_method: str
     shipping_address: str
     phone_number: str
@@ -69,5 +73,17 @@ class OrderResponse(BaseModel):
     
     items: List[OrderItemResponse] = []
 
+    @field_validator('discount_amount', mode='before')
+    def set_default_discount(cls, v):
+        return v or 0.0
+
     class Config:
         from_attributes = True
+
+
+class OrderSimulateResponse(BaseModel):
+    items_total: float
+    shipping_fee: float
+    discount_amount: float
+    final_total: float
+    coupon_applied: Optional[str] = None

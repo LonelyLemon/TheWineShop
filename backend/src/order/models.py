@@ -43,10 +43,15 @@ class Order(Base):
     phone_number = Column(String(20), nullable=False)
     note = Column(Text, nullable=True)
     
-    created_at = Column(DateTime, default=datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), default=datetime.now(timezone.utc))
 
     items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
     user = relationship("User")
+
+    discount_amount = Column(DECIMAL(12, 2), default=0)
+    promotion_id = Column(UUID(as_uuid=True), ForeignKey("promotions.id"), nullable=True)
+
+    promotion = relationship("Promotion")
 
 class OrderItem(Base):
     __tablename__ = "order_items"

@@ -10,6 +10,10 @@ const CheckoutPage = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
+  const [couponCode, setCouponCode] = useState('');
+  const [discountInfo, setDiscountInfo] = useState({ amount: 0, appliedCode: null });
+  const [finalTotal, setFinalTotal] = useState(0);
+
   const [shippingInfo, setShippingInfo] = useState({
     address: '',
     phone: '',
@@ -17,6 +21,14 @@ const CheckoutPage = () => {
     payment_method: 'cod',
     delivery_mode: 'regular'
   });
+
+  const getShippingFee = (mode) => {
+    switch (mode) {
+        case 'express': return 50000;
+        case 'sea': return 20000;
+        default: return 30000;
+    }
+  };
 
   useEffect(() => {
     const initData = async () => {
@@ -29,21 +41,30 @@ const CheckoutPage = () => {
         }
         setCart(cartRes.data);
 
-        const userRes = await axiosClient.get('/api/users/me');
-        const u = userRes.data;
-        
-        const fullAddress = [u.address_line_1, u.city, u.country].filter(Boolean).join(', ');
-        
-        setShippingInfo(prev => ({
-            ...prev,
-            address: fullAddress || '',
-            phone: u.phone_number || ''
-        }));
+        try {
+            const userRes = await axiosClient.get('/api/users/me');
+            const u = userRes.data;
+            const fullAddress = [u.address_line_1, u.city, u.country].filter(Boolean).join(', ');
+            
+            setShippingInfo(prev => ({
+                ...prev,
+                address: fullAddress || '',
+                phone: u.phone_number || ''
+            }));
+        // eslint-disable-next-line no-unused-vars
+        } catch (e) {
+            // Chưa login
+        }
+
+        const fee = getShippingFee('regular');
+        setFinalTotal(cartRes.data.total_price + fee);
 
       } catch (error) {
          if (error.response?.status === 401) {
              toast.warning("Vui lòng đăng nhập để thanh toán");
              navigate('/login');
+         } else {
+             console.error(error);
          }
       } finally {
         setLoading(false);
@@ -52,11 +73,50 @@ const CheckoutPage = () => {
     initData();
   }, [navigate]);
 
-  const getShippingFee = () => {
-      switch (shippingInfo.delivery_mode) {
-          case 'express': return 50000;
-          case 'sea': return 20000;
-          default: return 30000;
+  const calculateTotal = async (code = null, currentDeliveryMode = null) => {
+      const mode = currentDeliveryMode || shippingInfo.delivery_mode;
+      
+      try {
+          const payload = {
+              shipping_address: shippingInfo.address || 'temp', 
+              phone_number: shippingInfo.phone || '000',
+              delivery_mode: mode,
+              coupon_code: code
+          };
+          
+          const res = await axiosClient.post('/api/cart/simulate', payload);
+          
+          setDiscountInfo({
+              amount: res.data.discount_amount,
+              appliedCode: res.data.coupon_applied
+          });
+          setFinalTotal(res.data.final_total);
+          
+          return res.data;
+      } catch (error) {
+          console.error("Lỗi tính giá:", error);
+          return null;
+      }
+  };
+
+  useEffect(() => {
+      if (cart) {
+          calculateTotal(discountInfo.appliedCode || couponCode, shippingInfo.delivery_mode);
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shippingInfo.delivery_mode]);
+
+  const handleApplyCoupon = async () => {
+      if (!couponCode.trim()) return;
+      
+      const res = await calculateTotal(couponCode, shippingInfo.delivery_mode);
+      
+      if (res && res.coupon_applied) {
+          toast.success(`Đã áp dụng mã: ${res.coupon_applied}`);
+      } else {
+          toast.error("Mã giảm giá không hợp lệ hoặc không đủ điều kiện");
+          setDiscountInfo({ amount: 0, appliedCode: null });
+          calculateTotal(null, shippingInfo.delivery_mode);
       }
   };
 
@@ -73,14 +133,13 @@ const CheckoutPage = () => {
           phone_number: shippingInfo.phone,
           note: shippingInfo.note,
           payment_method: shippingInfo.payment_method,
-          delivery_mode: shippingInfo.delivery_mode
+          delivery_mode: shippingInfo.delivery_mode,
+          coupon_code: discountInfo.appliedCode
       };
 
       await axiosClient.post('/api/cart/orders', payload);
       toast.success("Đặt hàng thành công!");
-      
       navigate('/orders');
-
     } catch (error) {
       toast.error(error.response?.data?.detail || "Lỗi đặt hàng");
     } finally {
@@ -88,10 +147,9 @@ const CheckoutPage = () => {
     }
   };
 
-  if (loading) return <div>Đang tải...</div>;
+  if (loading) return <div className="loading-container">Đang tải...</div>;
 
-  const shippingFee = getShippingFee();
-  const totalAmount = cart.total_price + shippingFee;
+  const currentShippingFee = getShippingFee(shippingInfo.delivery_mode);
 
   return (
     <div className="checkout-container">
@@ -166,7 +224,7 @@ const CheckoutPage = () => {
         <div className="order-summary">
             <h3>Đơn hàng của bạn</h3>
             <div className="summary-items">
-                {cart.items.map(item => (
+                {cart && cart.items.map(item => (
                     <div key={item.id} className="summary-item">
                         <span>{item.wine.name} (x{item.quantity})</span>
                         <span>{new Intl.NumberFormat('vi-VN').format(item.subtotal)} đ</span>
@@ -175,17 +233,43 @@ const CheckoutPage = () => {
             </div>
             <div className="summary-divider"></div>
             
+            <div className="coupon-section" style={{display: 'flex', gap: '5px', marginBottom: '15px'}}>
+                <input 
+                    type="text" 
+                    placeholder="Mã giảm giá" 
+                    value={couponCode}
+                    onChange={(e) => setCouponCode(e.target.value)}
+                    style={{flex: 1, padding: '8px', border: '1px solid #ddd', borderRadius: '4px'}}
+                />
+                <button 
+                    onClick={handleApplyCoupon}
+                    style={{padding: '8px 15px', background: '#333', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer'}}
+                >
+                    Áp dụng
+                </button>
+            </div>
+
             <div className="summary-row">
                 <span>Tạm tính:</span>
-                <span>{new Intl.NumberFormat('vi-VN').format(cart.total_price)} đ</span>
+                <span>{cart ? new Intl.NumberFormat('vi-VN').format(cart.total_price) : 0} đ</span>
             </div>
             <div className="summary-row">
                 <span>Phí vận chuyển:</span>
-                <span>{new Intl.NumberFormat('vi-VN').format(shippingFee)} đ</span>
+                <span>{new Intl.NumberFormat('vi-VN').format(currentShippingFee)} đ</span>
             </div>
+
+            {discountInfo.amount > 0 && (
+                <div className="summary-row" style={{color: 'green', fontWeight: 'bold'}}>
+                    <span>Giảm giá ({discountInfo.appliedCode}):</span>
+                    <span>- {new Intl.NumberFormat('vi-VN').format(discountInfo.amount)} đ</span>
+                </div>
+            )}
+            
+            <div className="summary-divider"></div>
+
             <div className="summary-row total">
                 <span>Tổng cộng:</span>
-                <span>{new Intl.NumberFormat('vi-VN').format(totalAmount)} đ</span>
+                <span>{new Intl.NumberFormat('vi-VN').format(finalTotal)} đ</span>
             </div>
 
             <button 

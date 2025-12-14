@@ -132,3 +132,34 @@ class InventoryImport(BaseModel):
     quantity: int
     import_price: float
     batch_code: Optional[str] = None
+
+# --- Promotion Schemas ---
+
+class PromotionBase(BaseModel):
+    name: str
+    code: Optional[str] = None
+    description: Optional[str] = None
+    discount_percentage: float
+    start_date: datetime
+    end_date: datetime
+    is_active: bool = True
+    trigger_type: str = "period"
+    min_quantity: int = 0
+
+class PromotionCreate(PromotionBase):
+    pass
+
+class PromotionUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    discount_percentage: Optional[float] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    is_active: Optional[bool] = None
+    min_quantity: Optional[int] = None
+
+class PromotionResponse(PromotionBase):
+    id: UUID
+    
+    class Config:
+        from_attributes = True

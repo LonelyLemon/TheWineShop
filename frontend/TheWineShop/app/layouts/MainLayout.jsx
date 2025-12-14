@@ -43,7 +43,10 @@ const MainLayout = () => {
                     <Link to="/admin/inventory" className="admin-link">🏭 Kho hàng (Inventory)</Link>
 
                     {isAdminOnly && (
+                      <>
+                        <Link to="/admin/promotions" className="admin-link">🎟️ Khuyến mãi (Promotions)</Link>
                         <Link to="/admin/users" className="admin-link">👥 Quản lý Người dùng</Link>
+                      </>
                     )}
                 </nav>
             </aside>

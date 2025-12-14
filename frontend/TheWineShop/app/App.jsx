@@ -20,6 +20,8 @@ import AdminProductsPage from './pages/admin/AdminProductsPage';
 import AdminProductCreatePage from './pages/admin/AdminProductCreatePage';
 import AdminProductEditPage from './pages/admin/AdminProductEditPage';
 import AdminInventoryPage from './pages/admin/AdminInventoryPage';
+import AdminPromotionsPage from './pages/admin/AdminPromotionsPage';
+
 import './App.css';
 
 function App() {
@@ -45,6 +47,7 @@ function App() {
            <Route path="/admin/products/new" element={<AdminProductCreatePage />} />
            <Route path="/admin/products/:id" element={<AdminProductEditPage />} />
            <Route path="/admin/inventory" element={<AdminInventoryPage />} />
+           <Route path="/admin/promotions" element={<AdminPromotionsPage />} />
         </Route>
       </Routes>
     </>

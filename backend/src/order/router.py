@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 from uuid import UUID
 from decimal import Decimal
@@ -14,8 +14,9 @@ from src.auth.security import decode_token
 from src.user.models import User
 from src.order.models import Cart, CartItem, Order, OrderItem
 from src.product.models import Wine, Inventory
-from src.order.schemas import CartResponse, CartItemCreate, OrderCreate, OrderResponse
+from src.order.schemas import CartResponse, CartItemCreate, OrderCreate, OrderResponse, OrderSimulateResponse
 from src.product.schemas import CategoryBase, WineListResponse
+from src.order.discount_service import discount_service
 
 cart_router = APIRouter(
     prefix="/cart",
@@ -27,11 +28,6 @@ async def get_user_or_session(
     db: SessionDep,
     x_session_id: Optional[str] = Header(None)
 ):
-    """
-    Trả về (user, session_id).
-    - Nếu có Token hợp lệ -> user object, session_id=None
-    - Nếu không -> user=None, session_id=x_session_id
-    """
     auth_header = request.headers.get("Authorization")
     user = None
     
@@ -218,23 +214,31 @@ async def create_order(
         # 2. Tính phí ship
         shipping_fee = calculate_shipping_fee(payload.delivery_mode, items_total)
         
+        discount_amount, promo_id = await discount_service.calculate_discount(
+            db, cart, current_user, payload.coupon_code
+        )
+
         # 3. Tổng tiền cuối cùng
-        final_total = items_total + shipping_fee
+        final_total = items_total + shipping_fee - discount_amount
+        if final_total < 0: 
+            final_total = 0
 
         # 4. Tạo Order
         new_order = Order(
             user_id=current_user.id,
             status="pending",
-
             total_amount=final_total,
+
+            discount_amount=discount_amount,
+            promotion_id=promo_id,
+
             delivery_mode=payload.delivery_mode,
             delivery_cost=shipping_fee,
-            
             payment_method=payload.payment_method,
             shipping_address=payload.shipping_address,
             phone_number=payload.phone_number,
             note=payload.note,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
         db.add(new_order)
         await db.flush()
@@ -357,3 +361,35 @@ async def merge_carts(
     
     await db.commit()
     return {"message": "Cart merged successfully (Items merged)"}
+
+
+@cart_router.post("/simulate", response_model=OrderSimulateResponse)
+async def simulate_order_price(
+    payload: OrderCreate,
+    db: SessionDep,
+    current_user: User = Depends(get_current_user)
+):
+    cart = await get_or_create_cart_helper(db, current_user, None)
+    
+    # 1. Tổng tiền hàng
+    items_total = sum(item.quantity * item.price_at_add for item in cart.items) if cart.items else Decimal(0)
+    
+    # 2. Phí ship
+    shipping_fee = calculate_shipping_fee(payload.delivery_mode, items_total)
+    
+    # 3. Tính giảm giá
+    discount_amount, promo_id = await discount_service.calculate_discount(
+        db, cart, current_user, payload.coupon_code
+    )
+    
+    # 4. Tổng cuối
+    final_total = items_total + shipping_fee - discount_amount
+    if final_total < 0: final_total = 0
+    
+    return {
+        "items_total": items_total,
+        "shipping_fee": shipping_fee,
+        "discount_amount": discount_amount,
+        "final_total": final_total,
+        "coupon_applied": payload.coupon_code if promo_id else None
+    }
