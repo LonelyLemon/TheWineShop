@@ -4,6 +4,7 @@ import axiosClient from '../api/axiosClient';
 import { toast } from 'react-toastify';
 import './ProductDetailPage.css';
 import { useCart } from '../context/CartContext';
+import ReviewSection from '../components/ReviewSection';
 
 const ProductDetailPage = () => {
   const { id } = useParams();
@@ -111,6 +112,7 @@ const ProductDetailPage = () => {
           </div>
         </div>
       </div>
+      <ReviewSection wineId={id} />
     </div>
   );
 };

@@ -1,5 +1,5 @@
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from slugify import slugify
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -7,10 +7,21 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy import func
 
-from src.auth.dependencies import allow_staff
+from src.auth.dependencies import allow_staff, get_current_user
 from src.user.models import User
 from src.core.database import SessionDep
-from src.product.models import Wine, Category, WineImage, Inventory, Region, Winery, GrapeVariety, WineGrape, Promotion
+from src.product.models import (
+    Wine, 
+    Category, 
+    WineImage, 
+    Inventory, 
+    Region, 
+    Winery, 
+    GrapeVariety, 
+    WineGrape, 
+    Promotion, 
+    ProductReview
+)
 from src.product.schemas import (
     WineListResponse, 
     WineDetailResponse, 
@@ -23,7 +34,9 @@ from src.product.schemas import (
     InventoryImport,
     PromotionCreate, 
     PromotionUpdate, 
-    PromotionResponse
+    PromotionResponse,
+    ReviewCreate,
+    ReviewResponse
 )
 
 product_router = APIRouter(
@@ -399,3 +412,74 @@ async def toggle_promotion(
     promo.is_active = not promo.is_active
     await db.commit()
     return {"message": "Đã đổi trạng thái", "is_active": promo.is_active}
+
+# ---------------------------------------------------------
+# 4. REVIEWS MANAGEMENT
+# ---------------------------------------------------------
+
+@product_router.get("/wines/{wine_id}/reviews", response_model=List[ReviewResponse])
+async def get_wine_reviews(
+    wine_id: UUID, 
+    db: SessionDep,
+    skip: int = 0, 
+    limit: int = 10
+):
+    # Lấy danh sách review, join với User để lấy tên
+    query = select(ProductReview).options(
+        selectinload(ProductReview.user) # Giả sử trong model Review có relationship 'user'
+    ).where(ProductReview.wine_id == wine_id).order_by(ProductReview.created_at.desc())
+    
+    query = query.offset(skip).limit(limit)
+    result = await db.execute(query)
+    reviews = result.scalars().all()
+    
+    # Map sang Response
+    response = []
+    for r in reviews:
+        # Xử lý tên user (ẩn danh bớt nếu cần)
+        user_name = f"{r.user.last_name} {r.user.first_name}" if r.user else "Anonymous"
+        response.append(ReviewResponse(
+            id=r.id,
+            user_name=user_name,
+            rating=r.rating,
+            comment=r.comment,
+            created_at=r.created_at # Cần đảm bảo model Review có created_at
+        ))
+    
+    return response
+
+@product_router.post("/wines/{wine_id}/reviews", response_model=ReviewResponse)
+async def create_review(
+    wine_id: UUID,
+    payload: ReviewCreate,
+    db: SessionDep,
+    current_user: User = Depends(get_current_user)
+):
+    wine = await db.get(Wine, wine_id)
+    if not wine:
+        raise HTTPException(status_code=404, detail="Sản phẩm không tồn tại")
+    
+    if payload.rating < 1 or payload.rating > 5:
+        raise HTTPException(status_code=400, detail="Đánh giá phải từ 1 đến 5 sao")
+
+    new_review = ProductReview(
+        user_id=current_user.id,
+        wine_id=wine_id,
+        rating=payload.rating,
+        comment=payload.comment,
+        created_at=datetime.now(timezone.utc)
+    )
+    
+    db.add(new_review)
+    await db.commit()
+    await db.refresh(new_review)
+    
+    user_name = f"{current_user.last_name} {current_user.first_name}"
+    
+    return ReviewResponse(
+        id=new_review.id,
+        user_name=user_name,
+        rating=new_review.rating,
+        comment=new_review.comment,
+        created_at=new_review.created_at
+    )

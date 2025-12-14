@@ -143,5 +143,8 @@ class ProductReview(Base):
     
     parent_id = Column(UUID(as_uuid=True), ForeignKey("product_reviews.id"), nullable=True)
     
+    created_at = Column(DateTime(timezone=True), default=datetime.now(timezone.utc))
+
     wine = relationship("Wine", back_populates="reviews")
     replies = relationship("ProductReview", remote_side='[ProductReview.id]')
+    user = relationship("User")

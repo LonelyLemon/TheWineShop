@@ -163,3 +163,19 @@ class PromotionResponse(PromotionBase):
     
     class Config:
         from_attributes = True
+
+# --- Review Schemas ---
+
+class ReviewCreate(BaseModel):
+    rating: int # 1-5
+    comment: Optional[str] = None
+
+class ReviewResponse(BaseModel):
+    id: UUID
+    user_name: str
+    rating: int
+    comment: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
