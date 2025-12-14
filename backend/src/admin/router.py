@@ -1,6 +1,7 @@
 from typing import List
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from pydantic import BaseModel
@@ -10,7 +11,7 @@ from src.user.models import User
 from src.user.schemas import UserResponse
 from src.auth.dependencies import allow_staff, allow_admin
 from src.order.models import Order, OrderItem
-from src.product.models import Wine
+from src.product.models import Inventory, Wine
 from src.order.schemas import OrderResponse
 
 
@@ -121,3 +122,52 @@ async def ban_user(
     await db.commit()
     action = "Mở khóa" if payload.is_active else "Khóa"
     return {"message": f"Đã {action} tài khoản {user.email}"}
+
+
+# --------------------------
+# THỐNG KÊ SỐ LIỆU
+# --------------------------
+
+@admin_router.get("/stats")
+async def get_dashboard_stats(
+    db: SessionDep,
+    current_user: User = Depends(allow_staff)
+):
+    # 1. Tổng doanh thu (Chỉ tính đơn đã hoàn thành hoặc đang giao)
+    revenue_query = select(func.sum(Order.total_amount)).where(Order.status == 'completed')
+    revenue_res = await db.execute(revenue_query)
+    total_revenue = revenue_res.scalar() or 0
+
+    # 2. Tổng số đơn hàng
+    orders_count_query = select(func.count(Order.id))
+    orders_res = await db.execute(orders_count_query)
+    total_orders = orders_res.scalar() or 0
+    
+    # 3. Đơn hàng mới (Pending)
+    pending_query = select(func.count(Order.id)).where(Order.status == 'pending')
+    pending_res = await db.execute(pending_query)
+    pending_orders = pending_res.scalar() or 0
+
+    # 4. Tổng khách hàng
+    users_query = select(func.count(User.id)).where(User.role == 'customer')
+    users_res = await db.execute(users_query)
+    total_customers = users_res.scalar() or 0
+
+    # 5. Cảnh báo kho thấp
+    low_stock_query = (
+        select(Wine.id, Wine.name, func.sum(Inventory.quantity_available).label("total_stock"))
+        .join(Inventory, Wine.id == Inventory.wine_id)
+        .group_by(Wine.id, Wine.name)
+        .having(func.sum(Inventory.quantity_available) < 10)
+    )
+    low_stock_res = await db.execute(low_stock_query)
+    low_stock_items = low_stock_res.all()
+
+    return {
+        "revenue": total_revenue,
+        "total_orders": total_orders,
+        "pending_orders": pending_orders,
+        "total_customers": total_customers,
+        "low_stock_count": len(low_stock_items),
+        "low_stock_details": [{"name": item.name, "stock": item.total_stock} for item in low_stock_items]
+    }

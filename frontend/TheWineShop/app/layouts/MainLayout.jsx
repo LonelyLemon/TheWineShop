@@ -37,6 +37,7 @@ const MainLayout = () => {
                     {userRole === 'admin' ? 'Admin Panel' : 'Stock Manager'}
                 </h3>
                 <nav style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
+                    <Link to="/admin/dashboard" className="admin-link">📊 Tổng quan (Dashboard)</Link>
                     <Link to="/admin/orders" className="admin-link">📦 Quản lý Đơn hàng</Link>
                     <Link to="/admin/products" className="admin-link">🍷 Quản lý Sản phẩm</Link>
                     

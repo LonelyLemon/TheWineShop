@@ -21,6 +21,7 @@ import AdminProductCreatePage from './pages/admin/AdminProductCreatePage';
 import AdminProductEditPage from './pages/admin/AdminProductEditPage';
 import AdminInventoryPage from './pages/admin/AdminInventoryPage';
 import AdminPromotionsPage from './pages/admin/AdminPromotionsPage';
+import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 
 import './App.css';
 
@@ -41,6 +42,8 @@ function App() {
            <Route path="/checkout" element={<CheckoutPage />} />
            <Route path="/orders" element={<OrdersPage />} />
            <Route path="/profile" element={<ProfilePage />} />
+           <Route path="/admin" element={<AdminDashboardPage />} />
+           <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
            <Route path="/admin/orders" element={<AdminOrdersPage />} />
            <Route path="/admin/users" element={<AdminUsersPage />} />
            <Route path="/admin/products" element={<AdminProductsPage />} />
