@@ -19,6 +19,7 @@ import AdminUsersPage from './pages/admin/AdminUsersPage';
 import AdminProductsPage from './pages/admin/AdminProductsPage';
 import AdminProductCreatePage from './pages/admin/AdminProductCreatePage';
 import AdminProductEditPage from './pages/admin/AdminProductEditPage';
+import AdminInventoryPage from './pages/admin/AdminInventoryPage';
 import './App.css';
 
 function App() {
@@ -43,6 +44,7 @@ function App() {
            <Route path="/admin/products" element={<AdminProductsPage />} />
            <Route path="/admin/products/new" element={<AdminProductCreatePage />} />
            <Route path="/admin/products/:id" element={<AdminProductEditPage />} />
+           <Route path="/admin/inventory" element={<AdminInventoryPage />} />
         </Route>
       </Routes>
     </>
