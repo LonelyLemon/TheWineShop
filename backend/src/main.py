@@ -9,12 +9,12 @@ from loguru import logger
 from starlette.middleware.cors import CORSMiddleware
 
 from src.core.config import settings
-from src.routers import api_router
 from src.auth.router import auth_route
 from src.user.router import user_route
 from src.product.router import product_router
 from src.order.router import cart_router
 from src.admin.router import admin_router
+from src.chat_router import chat_router
 
 THIS_DIR = Path(__file__).parent
 
@@ -50,9 +50,9 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content=jsonable_encoder({"detail": exc.errors(), "body": exc.body}),
     )
 
-#app.include_router(api_router)
 app.include_router(auth_route, prefix="/api")
 app.include_router(user_route, prefix="/api")
 app.include_router(product_router, prefix="/api")
 app.include_router(cart_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
+app.include_router(chat_router, prefix="/api")

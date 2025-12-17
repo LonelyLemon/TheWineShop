@@ -1,5 +1,6 @@
 import React from 'react';
 import Navbar from '../components/Navbar';
+import Chatbot from '../components/Chatbot';
 import { Outlet } from 'react-router-dom';
 
 const MainLayout = () => {
@@ -13,6 +14,8 @@ const MainLayout = () => {
       <footer style={{ background: '#333', color: '#fff', padding: '20px', textAlign: 'center' }}>
         <p>&copy; 2025 TheWineShop. All rights reserved.</p>
       </footer>
+
+      <Chatbot />
     </>
   );
 };
