@@ -46,7 +46,7 @@ return (
 
         <ul className="nav-menu">
           <li className="nav-item"><Link to="/" className="nav-links">Trang chủ</Link></li>
-          <li className="nav-item"><Link to="/" className="nav-links">Sản phẩm</Link></li>
+          <li className="nav-item"><Link to="/products" className="nav-links">Sản phẩm</Link></li>
         </ul>
 
         <div className="nav-actions">
