@@ -1,8 +1,8 @@
-"""reinit_schema
+"""init
 
-Revision ID: 46f3143918e1
+Revision ID: 90826dacf0e9
 Revises: 
-Create Date: 2025-12-12 18:22:29.832308
+Create Date: 2025-12-20 14:45:11.855940
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '46f3143918e1'
+revision: str = '90826dacf0e9'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -43,15 +43,19 @@ def upgrade() -> None:
     op.create_index(op.f('grape_varieties_id_idx'), 'grape_varieties', ['id'], unique=False)
     op.create_table('promotions',
     sa.Column('name', sa.String(length=255), nullable=False),
+    sa.Column('code', sa.String(length=50), nullable=True),
     sa.Column('description', sa.Text(), nullable=True),
-    sa.Column('discount_percentage', sa.DECIMAL(precision=5, scale=2), nullable=True),
+    sa.Column('discount_percentage', sa.DECIMAL(precision=5, scale=2), nullable=False),
     sa.Column('start_date', sa.DateTime(), nullable=False),
     sa.Column('end_date', sa.DateTime(), nullable=False),
     sa.Column('is_active', sa.Boolean(), nullable=True),
+    sa.Column('trigger_type', sa.String(length=50), nullable=False),
+    sa.Column('min_quantity', sa.Integer(), nullable=True),
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('created_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.Column('updated_at', sa.TIMESTAMP(timezone=True), nullable=False),
-    sa.PrimaryKeyConstraint('id', name=op.f('promotions_pkey'))
+    sa.PrimaryKeyConstraint('id', name=op.f('promotions_pkey')),
+    sa.UniqueConstraint('code', name=op.f('promotions_code_key'))
     )
     op.create_index(op.f('promotions_id_idx'), 'promotions', ['id'], unique=False)
     op.create_table('regions',
@@ -66,19 +70,26 @@ def upgrade() -> None:
     op.create_index(op.f('regions_id_idx'), 'regions', ['id'], unique=False)
     op.create_index(op.f('regions_name_idx'), 'regions', ['name'], unique=False)
     op.create_table('user',
+    sa.Column('email', sa.String(length=50), nullable=False),
+    sa.Column('hashed_password', sa.String(length=512), nullable=False),
+    sa.Column('title', sa.String(length=10), nullable=True),
     sa.Column('first_name', sa.String(length=50), nullable=False),
     sa.Column('last_name', sa.String(length=50), nullable=False),
     sa.Column('middle_name', sa.String(length=50), nullable=True),
-    sa.Column('email', sa.String(length=50), nullable=False),
+    sa.Column('birthdate', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('phone_number', sa.String(length=50), nullable=True),
+    sa.Column('fax_number', sa.String(length=50), nullable=True),
+    sa.Column('address_line_1', sa.String(length=255), nullable=True),
+    sa.Column('address_line_2', sa.String(length=255), nullable=True),
+    sa.Column('city', sa.String(length=50), nullable=True),
+    sa.Column('state', sa.String(length=50), nullable=True),
+    sa.Column('zip_code', sa.String(length=20), nullable=True),
+    sa.Column('country', sa.String(length=50), nullable=True),
     sa.Column('email_verified', sa.Boolean(), nullable=False),
-    sa.Column('hashed_password', sa.String(length=512), nullable=False),
     sa.Column('role', sa.String(length=50), nullable=False),
     sa.Column('avatar_url', sa.String(length=512), nullable=True),
-    sa.Column('phone_number', sa.String(length=50), nullable=True),
-    sa.Column('address', sa.String(length=100), nullable=True),
-    sa.Column('city', sa.String(length=50), nullable=True),
-    sa.Column('birthdate', sa.DateTime(timezone=True), nullable=True),
     sa.Column('status', sa.String(length=20), nullable=False),
+    sa.Column('address', sa.String(length=255), nullable=True),
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('created_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.Column('updated_at', sa.TIMESTAMP(timezone=True), nullable=False),
@@ -89,6 +100,7 @@ def upgrade() -> None:
     op.create_index(op.f('user_id_idx'), 'user', ['id'], unique=False)
     op.create_table('carts',
     sa.Column('user_id', sa.UUID(), nullable=True),
+    sa.Column('session_id', sa.String(length=255), nullable=True),
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('created_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.Column('updated_at', sa.TIMESTAMP(timezone=True), nullable=False),
@@ -96,17 +108,23 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id', name=op.f('carts_pkey'))
     )
     op.create_index(op.f('carts_id_idx'), 'carts', ['id'], unique=False)
+    op.create_index(op.f('carts_session_id_idx'), 'carts', ['session_id'], unique=False)
     op.create_table('orders',
     sa.Column('user_id', sa.UUID(), nullable=False),
     sa.Column('status', sa.String(length=50), nullable=True),
     sa.Column('total_amount', sa.DECIMAL(precision=12, scale=2), nullable=False),
+    sa.Column('delivery_mode', sa.String(length=50), nullable=True),
+    sa.Column('delivery_cost', sa.DECIMAL(precision=12, scale=2), nullable=True),
     sa.Column('payment_method', sa.String(length=50), nullable=True),
     sa.Column('shipping_address', sa.Text(), nullable=False),
     sa.Column('phone_number', sa.String(length=20), nullable=False),
     sa.Column('note', sa.Text(), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('discount_amount', sa.DECIMAL(precision=12, scale=2), nullable=True),
+    sa.Column('promotion_id', sa.UUID(), nullable=True),
     sa.Column('id', sa.Uuid(), nullable=False),
-    sa.Column('created_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.Column('updated_at', sa.TIMESTAMP(timezone=True), nullable=False),
+    sa.ForeignKeyConstraint(['promotion_id'], ['promotions.id'], name=op.f('orders_promotion_id_fkey')),
     sa.ForeignKeyConstraint(['user_id'], ['user.id'], name=op.f('orders_user_id_fkey')),
     sa.PrimaryKeyConstraint('id', name=op.f('orders_pkey'))
     )
@@ -150,6 +168,7 @@ def upgrade() -> None:
     sa.Column('cart_id', sa.UUID(), nullable=False),
     sa.Column('wine_id', sa.UUID(), nullable=False),
     sa.Column('quantity', sa.Integer(), nullable=True),
+    sa.Column('price_at_add', sa.DECIMAL(precision=12, scale=2), nullable=False),
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('created_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.Column('updated_at', sa.TIMESTAMP(timezone=True), nullable=False),
@@ -162,6 +181,7 @@ def upgrade() -> None:
     sa.Column('wine_id', sa.UUID(), nullable=False),
     sa.Column('batch_code', sa.String(length=50), nullable=True),
     sa.Column('quantity_available', sa.Integer(), nullable=True),
+    sa.Column('import_price', sa.DECIMAL(precision=12, scale=2), nullable=True),
     sa.Column('import_date', sa.DateTime(), nullable=True),
     sa.Column('expiry_date', sa.DateTime(), nullable=True),
     sa.Column('shelf_location', sa.String(length=100), nullable=True),
@@ -191,8 +211,8 @@ def upgrade() -> None:
     sa.Column('rating', sa.Integer(), nullable=False),
     sa.Column('comment', sa.Text(), nullable=True),
     sa.Column('parent_id', sa.UUID(), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('id', sa.Uuid(), nullable=False),
-    sa.Column('created_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.Column('updated_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.ForeignKeyConstraint(['parent_id'], ['product_reviews.id'], name=op.f('product_reviews_parent_id_fkey')),
     sa.ForeignKeyConstraint(['user_id'], ['user.id'], name=op.f('product_reviews_user_id_fkey')),
@@ -252,6 +272,7 @@ def downgrade() -> None:
     op.drop_table('wineries')
     op.drop_index(op.f('orders_id_idx'), table_name='orders')
     op.drop_table('orders')
+    op.drop_index(op.f('carts_session_id_idx'), table_name='carts')
     op.drop_index(op.f('carts_id_idx'), table_name='carts')
     op.drop_table('carts')
     op.drop_index(op.f('user_id_idx'), table_name='user')
