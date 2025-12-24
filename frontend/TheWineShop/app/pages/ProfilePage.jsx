@@ -1,147 +1,205 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import { useForm } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
+import * as yup from 'yup';
 import axiosClient from '../api/axiosClient';
 import { toast } from 'react-toastify';
-import './LoginPage.css';
+import './LoginPage.css'; 
 
 const ProfilePage = () => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  
+  // State để hiển thị ảnh preview
+  const [avatarPreview, setAvatarPreview] = useState(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  
+  // Ref để trigger input file ẩn
+  const fileInputRef = useRef(null);
 
-  const [formData, setFormData] = useState({
-    first_name: '',
-    last_name: '',
-    middle_name: '',
-    title: 'Mr',
-    phone_number: '',
-    fax_number: '',
-    address_line_1: '',
-    city: '',
-    zip_code: '',
-    country: '',
-    birthdate: ''
+  const schema = yup.object().shape({
+    first_name: yup.string().required('Tên không được để trống'),
+    last_name: yup.string().required('Họ không được để trống'),
+    phone_number: yup.string().nullable(),
+    address_line_1: yup.string().nullable(),
+    city: yup.string().nullable(),
+    avatar_url: yup.string().nullable()
+  });
+
+  const { register, handleSubmit, setValue, formState: { errors } } = useForm({
+    resolver: yupResolver(schema)
   });
 
   useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await axiosClient.get('/api/users/me');
+        const user = response.data;
+        
+        setValue('first_name', user.first_name);
+        setValue('last_name', user.last_name);
+        setValue('phone_number', user.phone_number);
+        setValue('address_line_1', user.address_line_1);
+        setValue('city', user.city);
+        
+        setAvatarPreview(user.avatar_url);
+        
+      // eslint-disable-next-line no-unused-vars
+      } catch (error) {
+        toast.error("Không thể tải thông tin người dùng");
+      } finally {
+        setInitialLoading(false);
+      }
+    };
+
     fetchProfile();
-  }, []);
+  }, [setValue]);
 
-  const fetchProfile = async () => {
+  // --- Xử lý Upload Avatar ---
+  const handleAvatarChange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      if (!file.type.startsWith('image/')) {
+          toast.error("Vui lòng chọn file ảnh");
+          return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+          toast.error("Kích thước ảnh không được quá 5MB");
+          return;
+      }
+
+      setUploadingAvatar(true);
+      try {
+          const formData = new FormData();
+          formData.append('file', file);
+
+          // 1. Upload ảnh lên API Media
+          const response = await axiosClient.post('/api/media/upload/image', formData, {
+              headers: { 'Content-Type': 'multipart/form-data' }
+          });
+
+          const { s3_key, url } = response.data;
+
+          // 2. Cập nhật Preview ngay lập tức
+          setAvatarPreview(url);
+
+          // 3. Set s3_key vào form data để chuẩn bị gửi lệnh Update User
+          // Lưu ý: Ta set vào field 'avatar_url' của form, nhưng giá trị là KEY
+          setValue('avatar_url', s3_key, { shouldDirty: true });
+          
+          toast.success("Tải ảnh lên xong. Hãy bấm Lưu thay đổi.");
+
+      } catch (error) {
+          console.error(error);
+          toast.error("Lỗi khi tải ảnh lên.");
+      } finally {
+          setUploadingAvatar(false);
+      }
+  };
+
+  const onSubmit = async (data) => {
+    setLoading(true);
     try {
-      const res = await axiosClient.get('/api/users/me');
-      setUser(res.data);
-
-      const u = res.data;
-      setFormData({
-        first_name: u.first_name || '',
-        last_name: u.last_name || '',
-        middle_name: u.middle_name || '',
-        title: u.title || 'Mr',
-        phone_number: u.phone_number || '',
-        fax_number: u.fax_number || '',
-        address_line_1: u.address_line_1 || u.address || '',
-        city: u.city || '',
-        zip_code: u.zip_code || '',
-        country: u.country || '',
-        birthdate: u.birthdate ? u.birthdate.split('T')[0] : ''
-      });
-    // eslint-disable-next-line no-unused-vars
+      await axiosClient.post('/api/users/update-user', data);
+      
+      toast.success("Cập nhật thông tin thành công!");
+      
+      window.location.reload(); 
     } catch (error) {
-      toast.error("Lỗi tải thông tin cá nhân");
+      console.error(error);
+      toast.error("Cập nhật thất bại.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleUpdate = async (e) => {
-    e.preventDefault();
-    setUpdating(true);
-    try {
-      const payload = { ...formData };
-      if (!payload.birthdate) delete payload.birthdate; 
-
-      await axiosClient.post('/api/users/update-user', payload);
-      toast.success("Cập nhật hồ sơ thành công!");
-      fetchProfile();
-    } catch (error) {
-      toast.error(error.response?.data?.detail || "Lỗi cập nhật");
-    } finally {
-      setUpdating(false);
-    }
-  };
-
-  if (loading) return <div>Đang tải...</div>;
+  if (initialLoading) return <div style={{textAlign: 'center', marginTop: '50px'}}>Loading...</div>;
 
   return (
-    <div className="login-container" style={{maxWidth: '800px', padding: '20px'}}>
-      <div className="login-card" style={{width: '100%', maxWidth: '100%'}}>
-        <h2>Hồ sơ cá nhân</h2>
-        <p className="login-subtitle">{user?.email}</p>
+    <div className="login-container" style={{ paddingTop: '50px', paddingBottom: '50px' }}>
+      <div className="login-card" style={{ maxWidth: '800px' }}>
+        <h2>Thông tin cá nhân</h2>
+        
+        <form onSubmit={handleSubmit(onSubmit)} style={{ marginTop: '20px' }}>
+          
+          {/* --- Avatar Section --- */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '30px' }}>
+              <div 
+                style={{ 
+                    width: '120px', 
+                    height: '120px', 
+                    borderRadius: '50%', 
+                    overflow: 'hidden', 
+                    marginBottom: '10px',
+                    border: '3px solid #800020',
+                    backgroundColor: '#f0f0f0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                }}
+              >
+                  {avatarPreview ? (
+                      <img 
+                        src={avatarPreview} 
+                        alt="Avatar" 
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                      />
+                  ) : (
+                      <span style={{ fontSize: '3rem', color: '#ccc' }}>👤</span>
+                  )}
+              </div>
+              
+              <input 
+                type="file" 
+                accept="image/*" 
+                style={{ display: 'none' }} 
+                ref={fileInputRef}
+                onChange={handleAvatarChange}
+              />
+              
+              <button 
+                type="button"
+                className="login-btn"
+                style={{ width: 'auto', padding: '5px 15px', fontSize: '0.9rem' }}
+                onClick={() => fileInputRef.current.click()}
+                disabled={uploadingAvatar}
+              >
+                  {uploadingAvatar ? 'Đang tải lên...' : 'Đổi ảnh đại diện'}
+              </button>
+          </div>
 
-        <form onSubmit={handleUpdate} style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px'}}>
-            <div>
-                <div className="form-group">
-                    <label>Danh xưng (Title)</label>
-                    <select name="title" value={formData.title} onChange={handleChange} style={{width: '100%', padding: '10px'}}>
-                        <option value="Mr">Ông (Mr)</option>
-                        <option value="Mrs">Bà (Mrs)</option>
-                        <option value="Ms">Cô (Ms)</option>
-                    </select>
-                </div>
-                <div className="form-group">
-                    <label>Họ (Last Name)</label>
-                    <input type="text" name="last_name" value={formData.last_name} onChange={handleChange} required />
-                </div>
-                <div className="form-group">
-                    <label>Tên đệm (Middle)</label>
-                    <input type="text" name="middle_name" value={formData.middle_name} onChange={handleChange} />
-                </div>
-                <div className="form-group">
-                    <label>Tên (First Name)</label>
-                    <input type="text" name="first_name" value={formData.first_name} onChange={handleChange} required />
-                </div>
-                <div className="form-group">
-                    <label>Ngày sinh</label>
-                    <input type="date" name="birthdate" value={formData.birthdate} onChange={handleChange} />
-                </div>
-            </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+             <div className="form-group">
+                <label>Họ</label>
+                <input {...register('last_name')} />
+                <p className="error-text">{errors.last_name?.message}</p>
+             </div>
+             <div className="form-group">
+                <label>Tên</label>
+                <input {...register('first_name')} />
+                <p className="error-text">{errors.first_name?.message}</p>
+             </div>
+          </div>
 
-            <div>
-                <div className="form-group">
-                    <label>Số điện thoại</label>
-                    <input type="text" name="phone_number" value={formData.phone_number} onChange={handleChange} />
-                </div>
-                <div className="form-group">
-                    <label>Fax</label>
-                    <input type="text" name="fax_number" value={formData.fax_number} onChange={handleChange} />
-                </div>
-                <div className="form-group">
-                    <label>Địa chỉ</label>
-                    <input type="text" name="address_line_1" value={formData.address_line_1} onChange={handleChange} required />
-                </div>
-                <div className="form-group">
-                    <label>Thành phố</label>
-                    <input type="text" name="city" value={formData.city} onChange={handleChange} required />
-                </div>
-                <div className="form-group" style={{display: 'flex', gap: '10px'}}>
-                    <div style={{flex: 1}}>
-                        <label>Zip Code</label>
-                        <input type="text" name="zip_code" value={formData.zip_code} onChange={handleChange} required />
-                    </div>
-                    <div style={{flex: 1}}>
-                        <label>Quốc gia</label>
-                        <input type="text" name="country" value={formData.country} onChange={handleChange} required />
-                    </div>
-                </div>
-            </div>
+          <div className="form-group">
+            <label>Số điện thoại</label>
+            <input {...register('phone_number')} placeholder="0909 xxx xxx" />
+          </div>
 
-            <button type="submit" className="login-btn" disabled={updating} style={{gridColumn: '1 / span 2', marginTop: '20px'}}>
-                {updating ? 'Đang lưu...' : 'Lưu thay đổi'}
-            </button>
+          <div className="form-group">
+            <label>Địa chỉ</label>
+            <input {...register('address_line_1')} placeholder="Số nhà, tên đường" />
+          </div>
+
+          <div className="form-group">
+            <label>Thành phố</label>
+            <input {...register('city')} />
+          </div>
+
+          <button type="submit" className="login-btn" disabled={loading}>
+            {loading ? 'Đang lưu...' : 'Lưu thay đổi'}
+          </button>
         </form>
       </div>
     </div>

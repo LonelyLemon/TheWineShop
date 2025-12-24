@@ -32,9 +32,31 @@ class S3Client:
         try:
             self.s3.head_bucket(Bucket=self.bucket_name)
         except ClientError as e:
+            # Code lỗi trả về thường là string "404"
             error_code = int(e.response["Error"]["Code"])
             if error_code == 404:
-                self.s3.create_bucket(Bucket=self.bucket_name)
+                try:
+                    # Chuẩn bị tham số tạo bucket
+                    params = {'Bucket': self.bucket_name}
+                    
+                    if self.s3.meta.region_name != 'us-east-1':
+                        params['CreateBucketConfiguration'] = {
+                            'LocationConstraint': self.s3.meta.region_name
+                        }
+                    
+                    self.s3.create_bucket(**params)
+                    logger.info(f"Created bucket {self.bucket_name}")
+                    
+                except ClientError as create_error:
+                    # Kiểm tra lỗi race condition
+                    c_code = create_error.response.get("Error", {}).get("Code")
+                    if c_code in ["BucketAlreadyOwnedByYou", "OperationAborted"]:
+                        # Bucket đã được tạo bởi process khác, bỏ qua lỗi
+                        logger.info(f"Bucket {self.bucket_name} already exists or is being created concurrently.")
+                    else:
+                        # Nếu là lỗi khác thì vẫn raise lên
+                        logger.error(f"Failed to create bucket: {create_error}")
+                        raise
             elif error_code == 403:
                 raise HTTPException(status_code=403, detail="Access denied to bucket")
             else:
@@ -47,6 +69,20 @@ class S3Client:
             logger.info(f"Uploaded to {s3_key}")
         except Exception as e:
             logger.info(f"Error uploading file: {e}")
+
+    def upload_fileobj(self, file_obj, s3_key: str, content_type: str = None):
+        """
+        Upload file trực tiếp từ bộ nhớ (stream) lên S3.
+        Thường dùng cho FastAPI UploadFile.
+        """
+        try:
+            extra_args = {'ContentType': content_type} if content_type else {}
+            self.s3.upload_fileobj(file_obj, self.bucket_name, s3_key, ExtraArgs=extra_args)
+            logger.info(f"Uploaded stream to {s3_key}")
+            return s3_key
+        except Exception as e:
+            logger.error(f"Error uploading file object: {e}")
+            raise e
 
     @run_in_executor
     def download_file(self, s3_key, local_path):
@@ -100,9 +136,9 @@ if settings.ENVIRONMENT.is_testing:
     s3_client = S3Client(bucket_name=settings.S3_BUCKET_NAME,
                          access_key=settings.S3_ACCESS_KEY,
                          secret_key=settings.S3_SECRET_KEY,
-                         endpoint_url=settings.MINIO_URL)
+                         region_name=settings.S3_REGION)
 else:
     s3_client = S3Client(bucket_name=settings.S3_BUCKET_NAME,
                          access_key=settings.S3_ACCESS_KEY,
-                         secret_key=settings.S3_SECRET_KEY)
-    
+                         secret_key=settings.S3_SECRET_KEY,
+                         region_name=settings.S3_REGION)
