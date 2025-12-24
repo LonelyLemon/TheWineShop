@@ -1,7 +1,9 @@
+from loguru import logger
+
+from sqlalchemy.future import select
+
 from fastapi import APIRouter, BackgroundTasks, Depends
 from fastapi_mail import MessageSchema, MessageType
-from sqlalchemy.future import select
-from loguru import logger
 
 from src.core.database import SessionDep
 from src.core.security import hash_password
@@ -15,7 +17,8 @@ from src.user.schemas import (
     UserCreate, 
     UserResponse,
     UserUpdate,
-    ForgetPasswordRequest
+    ForgetPasswordRequest,
+    ResendVerificationRequest,
 )
 from src.user.exceptions import (
     UserEmailExist,
@@ -185,3 +188,49 @@ async def forget_password(db: SessionDep,
     )
     
     background_tasks.add_task(email_service_basic.send_mail, message)
+
+#------------------------------------------
+#       RESEND VERIFICATION REQUEST
+#------------------------------------------
+
+@user_route.post('/resend-verification')
+async def resend_verification(
+    payload: ResendVerificationRequest,
+    db: SessionDep,
+    background_tasks: BackgroundTasks
+):
+    email_norm = payload.email.strip().lower()
+    result = await db.execute(select(User).where(User.email == email_norm))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise UserNotFound()
+
+    if user.email_verified:
+        return {"message": "Tài khoản này đã được xác thực trước đó."}
+
+    verify_token = create_verify_token(email_norm)
+    verify_link = f"{settings.FRONTEND_URL}/verify-email?token={verify_token}"
+
+    logger.info(f"--- DEV MODE RESEND VERIFICATION LINK ---")
+    logger.info(f"Link: {verify_link}")
+    logger.info(f"---------------------------------------")
+
+    html_content = f"""
+    <h1>Xin chào {user.last_name},</h1>
+    <p>Bạn đã yêu cầu gửi lại email xác thực tài khoản tại TheWineShop.</p>
+    <p>Vui lòng click vào đường dẫn sau để kích hoạt tài khoản:</p>
+    <a href="{verify_link}" style="background-color: #800020; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Xác thực ngay</a>
+    <p>Link này sẽ hết hạn sau 24 giờ.</p>
+    """
+
+    message = MessageSchema(
+        subject="TheWineShop - Gửi lại xác thực tài khoản",
+        recipients=[user.email],
+        body=html_content,
+        subtype=MessageType.html,
+    )
+    
+    background_tasks.add_task(email_service_basic.send_mail, message)
+
+    return {"message": "Email xác thực đã được gửi lại. Vui lòng kiểm tra hộp thư."}

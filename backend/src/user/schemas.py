@@ -64,3 +64,7 @@ class UserResponse(UserBase):
 
 class ForgetPasswordRequest(BaseModel):
     email: EmailStr
+
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr
+    
