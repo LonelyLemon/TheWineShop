@@ -105,8 +105,7 @@ const ProfilePage = () => {
       
       toast.success("Cập nhật thông tin thành công!");
       
-      // Refresh lại trang hoặc state nếu cần để đồng bộ
-      // window.location.reload(); 
+      window.location.reload(); 
     } catch (error) {
       console.error(error);
       toast.error("Cập nhật thất bại.");
@@ -169,7 +168,6 @@ const ProfilePage = () => {
                   {uploadingAvatar ? 'Đang tải lên...' : 'Đổi ảnh đại diện'}
               </button>
           </div>
-          {/* ---------------------- */}
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
              <div className="form-group">
