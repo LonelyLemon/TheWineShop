@@ -127,7 +127,7 @@ async def verify_email(token: str,
 #        GET USER INFO
 #-------------------------------
 
-@user_route.get('/me')
+@user_route.get('/me', response_model=UserResponse)
 async def get_user_info(current_user: UserResponse = Depends(get_current_user)):
     return current_user
 
@@ -135,7 +135,7 @@ async def get_user_info(current_user: UserResponse = Depends(get_current_user)):
 #        UPDATE USER
 #-------------------------------
 
-@user_route.post('/update-user')
+@user_route.post('/update-user', response_model=UserResponse)
 async def update_user(db: SessionDep, 
                       update_request: UserUpdate, 
                       current_user: UserResponse = Depends(get_current_user)):

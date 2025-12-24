@@ -48,6 +48,14 @@ class Settings(CustomBaseSettings):
     MAIL_PORT: str
     MAIL_HOST: str
     MAIL_FROM_NAME: str
+
+    # S3 Config
+    S3_BUCKET_NAME: str
+    S3_ACCESS_KEY: str
+    S3_SECRET_KEY: str
+    S3_REGION: str
+
+    MINIO_URL: str
     
     @computed_field
     @property

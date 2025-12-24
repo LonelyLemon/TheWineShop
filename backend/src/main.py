@@ -16,6 +16,7 @@ from src.product.router import product_router
 from src.order.router import cart_router
 from src.admin.router import admin_router
 from src.inventory.router import inventory_router
+from src.media.router import media_router
 
 THIS_DIR = Path(__file__).parent
 
@@ -58,3 +59,4 @@ app.include_router(product_router, prefix="/api")
 app.include_router(cart_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
 app.include_router(inventory_router, prefix="/api")
+app.include_router(media_router, prefix="/api")
