@@ -57,6 +57,7 @@ class Settings(CustomBaseSettings):
 
     # Google AI Gemini
     GOOGLE_API_KEY: str | None = None
+    DEEPSEEK_API_KEY: str | None = None
     
     @computed_field
     @property

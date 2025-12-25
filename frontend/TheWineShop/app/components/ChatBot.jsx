@@ -7,7 +7,7 @@ const ChatBot = () => {
   const [messages, setMessages] = useState([
     { 
       sender: 'ai', 
-      text: 'Xin chào! Tôi là trợ lý ảo của TheWineShop. Tôi có thể giúp bạn tìm loại rượu phù hợp cho bữa tiệc hoặc làm quà biếu không?' 
+      text: 'Xin chào! Tôi là trợ lý ảo của TheWineShop. Tôi có thể giúp bạn tìm loại rượu phù hợp cho bữa tiệc hoặc làm quà không ? Hoặc hãy cho tôi biết nếu bạn cần tôi hỗ trợ trong quá trình sử dụng ứng dụng.' 
     }
   ]);
   const [inputStr, setInputStr] = useState('');
