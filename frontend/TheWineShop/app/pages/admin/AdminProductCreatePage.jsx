@@ -1,20 +1,21 @@
-// app/pages/admin/AdminProductCreatePage.jsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axiosClient from '../../api/axiosClient';
 import { toast } from 'react-toastify';
-import './AdminOrdersPage.css'; // Tái sử dụng CSS admin
+import './AdminOrdersPage.css';
 
 const AdminProductCreatePage = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
-  // Data sources cho Dropdown
   const [categories, setCategories] = useState([]);
   const [wineries, setWineries] = useState([]);
   const [allGrapes, setAllGrapes] = useState([]);
 
-  // Form State
+  const [uploadingImg, setUploadingImg] = useState(false);
+  const [previewImg, setPreviewImg] = useState(null);
+  const fileInputRef = useRef(null);
+
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -47,10 +48,36 @@ const AdminProductCreatePage = () => {
     fetchData();
   }, []);
 
-  // Xử lý thay đổi input thường
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleImageChange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      setUploadingImg(true);
+      try {
+          const uploadData = new FormData();
+          uploadData.append('file', file);
+
+          const response = await axiosClient.post('/api/media/upload/image', uploadData, {
+              headers: { 'Content-Type': 'multipart/form-data' }
+          });
+
+          const { s3_key, url } = response.data;
+          
+          setPreviewImg(url);
+          setFormData(prev => ({ ...prev, image_url: s3_key }));
+          
+          toast.success("Đã tải ảnh lên");
+      } catch (error) {
+          console.error(error);
+          toast.error("Lỗi upload ảnh");
+      } finally {
+          setUploadingImg(false);
+      }
   };
 
   const handleAddGrapeRow = () => {
@@ -84,7 +111,7 @@ const AdminProductCreatePage = () => {
     try {
       const payload = {
           ...formData,
-          images: formData.image_url ? [formData.image_url] : [],
+          images: formData.image_url ? [formData.image_url] : [], 
           price: parseFloat(formData.price),
           alcohol_percentage: parseFloat(formData.alcohol_percentage),
           volume: parseInt(formData.volume),
@@ -156,47 +183,58 @@ const AdminProductCreatePage = () => {
 
         <div className="form-group" style={{background: '#f9f9f9', padding: '15px', borderRadius: '8px', border: '1px solid #ddd'}}>
             <label style={{fontWeight: 'bold', marginBottom: '10px', display: 'block'}}>Thành phần nho (Grape Composition)</label>
-            
             {formData.grapes.map((row, index) => (
                 <div key={index} style={{display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'center'}}>
-                    <select 
-                        style={{flex: 2}}
-                        value={row.grape_variety_id} 
-                        onChange={(e) => handleGrapeChange(index, 'grape_variety_id', e.target.value)}
-                    >
+                    <select style={{flex: 2}} value={row.grape_variety_id} onChange={(e) => handleGrapeChange(index, 'grape_variety_id', e.target.value)}>
                         <option value="">-- Chọn giống nho --</option>
                         {allGrapes.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                     </select>
-                    
-                    <input 
-                        type="number" 
-                        placeholder="%" 
-                        style={{flex: 1}}
-                        value={row.percentage} 
-                        onChange={(e) => handleGrapeChange(index, 'percentage', parseInt(e.target.value))}
-                    />
-                    
-                    <input 
-                        type="number" 
-                        placeholder="Thứ tự" 
-                        style={{flex: 1}}
-                        value={row.order} 
-                        onChange={(e) => handleGrapeChange(index, 'order', parseInt(e.target.value))}
-                    />
-
+                    <input type="number" placeholder="%" style={{flex: 1}} value={row.percentage} onChange={(e) => handleGrapeChange(index, 'percentage', parseInt(e.target.value))}/>
+                    <input type="number" placeholder="Thứ tự" style={{flex: 1}} value={row.order} onChange={(e) => handleGrapeChange(index, 'order', parseInt(e.target.value))}/>
                     <button type="button" onClick={() => handleRemoveGrapeRow(index)} style={{background: '#ff4d4f', color: 'white', border: 'none', padding: '5px 10px', cursor: 'pointer'}}>X</button>
                 </div>
             ))}
-            
-            <button type="button" onClick={handleAddGrapeRow} style={{background: '#1890ff', color: 'white', border: 'none', padding: '8px 15px', cursor: 'pointer', borderRadius: '4px'}}>
-                + Thêm thành phần nho
-            </button>
+            <button type="button" onClick={handleAddGrapeRow} style={{background: '#1890ff', color: 'white', border: 'none', padding: '8px 15px', cursor: 'pointer', borderRadius: '4px'}}>+ Thêm thành phần nho</button>
         </div>
 
         <div className="form-group">
-            <label>Ảnh sản phẩm (URL)</label>
-            <input type="text" name="image_url" placeholder="https://..." value={formData.image_url} onChange={handleChange} />
-            <small>Tạm thời nhập link ảnh trực tiếp</small>
+            <label>Ảnh sản phẩm</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginTop: '5px' }}>
+                <div 
+                    style={{ 
+                        width: '100px', height: '100px', 
+                        border: '1px dashed #ccc', borderRadius: '4px',
+                        overflow: 'hidden', display: 'flex',
+                        alignItems: 'center', justifyContent: 'center',
+                        backgroundColor: '#f9f9f9'
+                    }}
+                >
+                    {previewImg ? (
+                        <img src={previewImg} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                    ) : (
+                        <span style={{fontSize: '2rem', color: '#ddd'}}>📷</span>
+                    )}
+                </div>
+                
+                <div>
+                    <input 
+                        type="file" accept="image/*" 
+                        ref={fileInputRef} style={{ display: 'none' }}
+                        onChange={handleImageChange}
+                    />
+                    <button 
+                        type="button" 
+                        style={{ padding: '8px 15px', cursor: 'pointer', background: '#666', color: 'white', border: 'none', borderRadius: '4px' }}
+                        onClick={() => fileInputRef.current.click()}
+                        disabled={uploadingImg}
+                    >
+                        {uploadingImg ? 'Đang tải...' : 'Chọn ảnh từ máy'}
+                    </button>
+                    <p style={{fontSize: '0.8rem', color: '#888', marginTop: '5px'}}>
+                        Định dạng: jpg, png, webp. Tối đa 5MB.
+                    </p>
+                </div>
+            </div>
         </div>
 
         <div className="form-group">

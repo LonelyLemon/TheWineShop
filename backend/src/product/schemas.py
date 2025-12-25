@@ -1,7 +1,9 @@
 from typing import List, Optional
 from uuid import UUID
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
+
+from src.core.aws import s3_client
 
 # --- Base Schemas ---
 class CategoryBase(BaseModel):
@@ -50,6 +52,13 @@ class WineImageBase(BaseModel):
     image_url: str
     is_thumbnail: bool
     
+    @field_validator('image_url', mode='before')
+    @classmethod
+    def sign_image_url(cls, v):
+        if v and isinstance(v, str) and not v.startswith("http"):
+             return s3_client.get_presigned_url(v)
+        return v
+
     class Config:
         from_attributes = True
 
@@ -69,10 +78,17 @@ class WineListResponse(BaseModel):
     review_count: int = 0
     
     category: Optional[CategoryBase] = None
-
+    
     class Config:
         from_attributes = True
 
+    @field_validator('thumbnail', mode='before')
+    @classmethod
+    def sign_thumbnail(cls, v):
+        if v and isinstance(v, str) and not v.startswith("http"):
+             return s3_client.get_presigned_url(v)
+        return v
+    
 class WineDetailResponse(BaseModel):
     id: UUID
     name: str

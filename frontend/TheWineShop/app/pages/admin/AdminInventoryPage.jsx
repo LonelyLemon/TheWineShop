@@ -20,7 +20,7 @@ const AdminInventoryPage = () => {
     expiry_date: '',
     shelf_location: ''
   });
-
+ 
   const [adjustForm, setAdjustForm] = useState({
     quantity_adjustment: 0,
     reason: ''
