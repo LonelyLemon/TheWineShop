@@ -55,7 +55,8 @@ class Settings(CustomBaseSettings):
     S3_SECRET_KEY: str
     S3_REGION: str
 
-    MINIO_URL: str
+    # Google AI Gemini
+    GOOGLE_API_KEY: str | None = None
     
     @computed_field
     @property

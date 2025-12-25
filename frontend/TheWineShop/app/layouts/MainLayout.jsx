@@ -2,9 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import axiosClient from '../api/axiosClient';
+import ChatBot from '../components/ChatBot';
 
 const MainLayout = () => {
   const [userRole, setUserRole] = useState(null);
+  // eslint-disable-next-line no-unused-vars
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -56,6 +58,7 @@ const MainLayout = () => {
         <main style={{flex: 1, padding: '20px', background: '#f0f2f5'}}>
           <Outlet />
         </main>
+        <ChatBot />
       </div>
     </div>
   );
