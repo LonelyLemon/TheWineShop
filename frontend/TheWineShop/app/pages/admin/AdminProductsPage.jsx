@@ -30,7 +30,7 @@ const AdminProductsPage = () => {
         toast.error(error.response?.data?.detail || "Lỗi nhập kho");
     }
   };
-
+ 
   const fetchWines = async () => {
     try {
       const response = await axiosClient.get('/api/products/wines?limit=100');

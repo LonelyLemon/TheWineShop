@@ -7,7 +7,7 @@ const AdminPromotionsPage = () => {
   const [promotions, setPromotions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-
+ 
   const [formData, setFormData] = useState({
     name: '',
     code: '',

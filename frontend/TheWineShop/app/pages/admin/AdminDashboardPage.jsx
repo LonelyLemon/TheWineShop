@@ -54,7 +54,7 @@ const AdminDashboardPage = () => {
             <div className="stat-desc">Sản phẩm sắp hết hàng (&lt;10)</div>
         </div>
       </div>
-
+ 
       {stats.low_stock_count > 0 && (
           <div className="dashboard-section">
               <h2>⚠️ Sản phẩm sắp hết hàng</h2>

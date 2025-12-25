@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
@@ -11,6 +11,10 @@ const ProductForm = ({ initialData, isEdit }) => {
   const navigate = useNavigate();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
+  
+  const [uploadingImg, setUploadingImg] = useState(false);
+  const [previewImg, setPreviewImg] = useState(null);
+  const fileInputRef = useRef(null);
 
   const schema = yup.object().shape({
     name: yup.string().required('Tên sản phẩm là bắt buộc'),
@@ -22,7 +26,7 @@ const ProductForm = ({ initialData, isEdit }) => {
     country: yup.string().nullable(),
     region: yup.string().nullable(),
     description: yup.string().nullable(),
-    image_url: yup.string().url('Link ảnh không hợp lệ').nullable()
+    image_url: yup.string().nullable() 
   });
 
   const { register, handleSubmit, setValue, formState: { errors } } = useForm({
@@ -44,8 +48,10 @@ const ProductForm = ({ initialData, isEdit }) => {
 
     if (isEdit && initialData) {
         Object.keys(initialData).forEach(key => setValue(key, initialData[key]));
+        
         if(initialData.images && initialData.images.length > 0) {
-            setValue('image_url', initialData.images[0].image_url);
+            const firstImg = initialData.images[0];
+            setPreviewImg(firstImg.image_url);
         }
         if(initialData.category) {
             setValue('category_id', initialData.category.id);
@@ -53,18 +59,52 @@ const ProductForm = ({ initialData, isEdit }) => {
     }
   }, [initialData, isEdit, setValue]);
 
+  const handleImageChange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      setUploadingImg(true);
+      try {
+          const formData = new FormData();
+          formData.append('file', file);
+
+          const response = await axiosClient.post('/api/media/upload/image', formData, {
+              headers: { 'Content-Type': 'multipart/form-data' }
+          });
+
+          const { s3_key, url } = response.data;
+          
+          setPreviewImg(url);
+          setValue('image_url', s3_key, { shouldDirty: true });
+          
+          toast.success("Đã tải ảnh lên");
+      } catch (error) {
+          console.error(error);
+          toast.error("Lỗi upload ảnh");
+      } finally {
+          setUploadingImg(false);
+      }
+  };
+
   const onSubmit = async (data) => {
     setLoading(true);
     try {
-      const payload = {
-        ...data,
-        images: data.image_url ? [data.image_url] : []
-      };
+      const payload = { ...data };
+      
+      if (data.image_url && !data.image_url.startsWith('http')) {
+          payload.images = [data.image_url];
+      } else {
+          delete payload.images;
+          delete payload.image_url; 
+      }
 
       if (isEdit) {
         await axiosClient.patch(`/api/products/wines/${initialData.id}`, payload);
         toast.success("Cập nhật thành công!");
       } else {
+        if (!payload.images || payload.images.length === 0) {
+            toast.warning("Chưa có ảnh sản phẩm");
+        }
         await axiosClient.post('/api/products/wines', payload);
         toast.success("Tạo sản phẩm thành công!");
       }
@@ -110,11 +150,54 @@ const ProductForm = ({ initialData, isEdit }) => {
                     <p className="error-text">{errors.price?.message}</p>
                 </div>
 
+                {/* --- IMAGE UPLOAD SECTION --- */}
                 <div className="form-group">
-                    <label>Link Ảnh (URL)</label>
-                    <input type="text" {...register('image_url')} placeholder="https://..." />
-                    <p className="error-text">{errors.image_url?.message}</p>
+                    <label>Hình ảnh sản phẩm</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginTop: '5px' }}>
+                        <div 
+                            style={{ 
+                                width: '80px', 
+                                height: '80px', 
+                                border: '1px dashed #ccc', 
+                                borderRadius: '4px',
+                                overflow: 'hidden',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                backgroundColor: '#f9f9f9'
+                            }}
+                        >
+                            {previewImg ? (
+                                <img src={previewImg} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                            ) : (
+                                <span style={{fontSize: '2rem', color: '#ddd'}}>📷</span>
+                            )}
+                        </div>
+                        
+                        <div>
+                            <input 
+                                type="file" 
+                                accept="image/*" 
+                                ref={fileInputRef}
+                                style={{ display: 'none' }}
+                                onChange={handleImageChange}
+                            />
+                            <button 
+                                type="button" 
+                                className="login-btn" 
+                                style={{ width: 'auto', padding: '5px 15px', fontSize: '0.8rem', backgroundColor: '#666' }}
+                                onClick={() => fileInputRef.current.click()}
+                                disabled={uploadingImg}
+                            >
+                                {uploadingImg ? 'Đang tải...' : 'Chọn ảnh'}
+                            </button>
+                            <p style={{fontSize: '0.8rem', color: '#888', marginTop: '5px'}}>
+                                Định dạng: jpg, png, webp. Max 5MB.
+                            </p>
+                        </div>
+                    </div>
                 </div>
+                {/* --------------------------- */}
             </div>
 
             <div style={{flex: 1, minWidth: '300px'}}>
@@ -152,7 +235,7 @@ const ProductForm = ({ initialData, isEdit }) => {
             </div>
 
             <div style={{width: '100%', marginTop: '10px'}}>
-                <button type="submit" disabled={loading} className="login-btn">
+                <button type="submit" disabled={loading || uploadingImg} className="login-btn">
                     {loading ? 'Đang lưu...' : (isEdit ? 'Cập nhật' : 'Tạo mới')}
                 </button>
             </div>

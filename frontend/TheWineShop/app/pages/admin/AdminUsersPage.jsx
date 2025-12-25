@@ -7,7 +7,6 @@ const AdminUsersPage = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Load danh sách user
   const fetchUsers = async () => {
     try {
       const response = await axiosClient.get('/api/admin/users');
@@ -109,7 +108,7 @@ const AdminUsersPage = () => {
                             fontWeight: 'bold',
                             color: user.role === 'admin' ? 'red' : (user.role === 'stock_manager' ? 'blue' : 'black')
                         }}
-                    >
+                    > 
                         <option value="customer">Khách hàng</option>
                         <option value="stock_manager">Thủ kho</option>
                         <option value="admin">Admin</option>
