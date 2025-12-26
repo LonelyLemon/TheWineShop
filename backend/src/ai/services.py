@@ -1,5 +1,6 @@
-from google import genai
-from google.genai import types
+import json
+from typing import Optional, List, Dict
+from openai import AsyncOpenAI
 from sqlalchemy.future import select
 from sqlalchemy import or_, and_
 from sqlalchemy.orm import selectinload
@@ -7,195 +8,217 @@ from loguru import logger
 
 from src.core.config import settings
 from src.product.models import Wine, Category
+from src.order.models import Cart, CartItem
 from src.core.database import SessionDep
+from src.user.schemas import UserResponse
 
-# --- CẤU HÌNH ---
 client = None
-if settings.GOOGLE_API_KEY:
-    client = genai.Client(api_key=settings.GOOGLE_API_KEY)
+if settings.DEEPSEEK_API_KEY:
+    client = AsyncOpenAI(
+        api_key=settings.DEEPSEEK_API_KEY, 
+        base_url="https://api.deepseek.com"
+    )
 
-# ---------------------------------------------------------
-# 1. IMPLEMENTATION (HÀM THỰC THI - ASYNC)
-# ---------------------------------------------------------
+# ----------------------
+# 1. IMPLEMENTATION
+# ----------------------
 
 async def search_wines_impl(keyword: str = "", max_price: float = 0, min_price: float = 0, wine_type: str = ""):
-    """Logic tìm kiếm sản phẩm trong Database"""
     db = _get_db_session_context()
-    
-    logger.info(f"⚡ [TOOL] search_wines: kw='{keyword}', price={min_price}-{max_price}, type='{wine_type}'")
-    
+    logger.info(f"⚡ [TOOL] search_wines: kw='{keyword}'")
     stmt = select(Wine).where(Wine.is_active == True).options(selectinload(Wine.category))
-    
     conditions = []
     if keyword:
-        conditions.append(or_(
-            Wine.name.ilike(f"%{keyword}%"),
-            Wine.description.ilike(f"%{keyword}%"),
-            Wine.category.has(Category.name.ilike(f"%{keyword}%"))
-        ))
-    if max_price > 0:
-        conditions.append(Wine.price <= max_price)
-    if min_price > 0:
-        conditions.append(Wine.price >= min_price)
-    if wine_type:
-        conditions.append(Wine.category.has(Category.name.ilike(f"%{wine_type}%")))
-
-    if conditions:
-        stmt = stmt.where(and_(*conditions))
-    
-    stmt = stmt.limit(8)
+        conditions.append(or_(Wine.name.ilike(f"%{keyword}%"), Wine.description.ilike(f"%{keyword}%"), Wine.category.has(Category.name.ilike(f"%{keyword}%"))))
+    if max_price > 0: conditions.append(Wine.price <= max_price)
+    if min_price > 0: conditions.append(Wine.price >= min_price)
+    if wine_type: conditions.append(Wine.category.has(Category.name.ilike(f"%{wine_type}%")))
+    if conditions: stmt = stmt.where(and_(*conditions))
+    stmt = stmt.limit(5)
     result = await db.execute(stmt)
     wines = result.scalars().all()
+    if not wines: return "Không tìm thấy sản phẩm nào phù hợp."
     
-    if not wines:
-        return "Không tìm thấy sản phẩm nào phù hợp."
-
-    # 👇 SỬA LỖI TẠI ĐÂY: Ép kiểu price sang float
-    results = []
-    for w in wines:
-        results.append({
-            "id": str(w.id),
-            "name": w.name,
-            "price": float(w.price) if w.price else 0.0, # Decimal -> Float
-            "type": w.category.name if w.category else ""
-        })
-    return results
+    results = [{"id": str(w.id), "name": w.name, "price": float(w.price) if w.price else 0.0} for w in wines]
+    return json.dumps(results, ensure_ascii=False)
 
 async def get_wine_detail_impl(wine_id: str):
-    """Logic lấy chi tiết sản phẩm"""
     db = _get_db_session_context()
-    logger.info(f"⚡ [TOOL] get_wine_detail: id={wine_id}")
-    
     try:
         stmt = select(Wine).where(Wine.id == wine_id).options(selectinload(Wine.category))
         result = await db.execute(stmt)
         wine = result.scalar_one_or_none()
+        if not wine: return "Sản phẩm không tồn tại."
+        return json.dumps({"id": str(wine.id), "name": wine.name, "price": float(wine.price), "description": wine.description}, ensure_ascii=False)
+    except: return "Lỗi ID."
+
+async def add_to_cart_impl(product_id: str, quantity: int = 1):
+    db = _get_db_session_context()
+    user = _get_user_context()
+    logger.info(f"[TOOL] add_to_cart: id={product_id}, qty={quantity}")
+    
+    if not user: return "LỖI: Khách hàng chưa đăng nhập. Hãy yêu cầu họ đăng nhập để mua hàng."
+    try:
+        product = await db.get(Wine, product_id)
+        if not product: return "Lỗi: Không tìm thấy sản phẩm với ID này."
         
-        if not wine:
-            return "Sản phẩm không tồn tại."
+        stmt = select(Cart).where(Cart.user_id == user.id)
+        cart = (await db.execute(stmt)).scalar_one_or_none()
+        if not cart:
+            cart = Cart(user_id=user.id)
+            db.add(cart)
+            await db.commit()
+            await db.refresh(cart)
+            
+        stmt_item = select(CartItem).where(CartItem.cart_id == cart.id, CartItem.product_id == product_id)
+        cart_item = (await db.execute(stmt_item)).scalar_one_or_none()
+        if cart_item: cart_item.quantity += quantity
+        else: db.add(CartItem(cart_id=cart.id, product_id=product_id, quantity=quantity))
         
-        # 👇 SỬA LỖI TẠI ĐÂY: Ép kiểu price và alcohol sang float
-        return {
-            "name": wine.name,
-            "price": float(wine.price) if wine.price else 0.0,
-            "description": wine.description,
-            "alcohol": float(wine.alcohol_percentage) if wine.alcohol_percentage else 0.0,
-            "vintage": wine.vintage,
-        }
+        await db.commit()
+        return f"THÀNH CÔNG: Đã thêm {quantity} chai {product.name} vào giỏ hàng."
     except Exception as e:
-        logger.error(f"Error getting wine detail: {e}")
-        return "Lỗi: ID sản phẩm không hợp lệ."
+        logger.error(f"Cart Error: {e}")
+        return "Lỗi hệ thống khi thêm giỏ hàng."
 
-# ---------------------------------------------------------
-# 2. DECLARATION (KHAI BÁO TOOLS CHO GEMINI)
-# ---------------------------------------------------------
+# ------------------------
+# 2. DEFINITION & PROMPT
+# ------------------------
 
-search_wines_tool = types.FunctionDeclaration(
-    name="search_wines",
-    description="Tìm kiếm danh sách rượu trong kho theo tên, giá hoặc loại.",
-    parameters=types.Schema(
-        type="OBJECT",
-        properties={
-            "keyword": types.Schema(type="STRING", description="Tên rượu, hoặc hương vị (vd: 'chát', 'ngọt', 'vang pháp')."),
-            "max_price": types.Schema(type="NUMBER", description="Giá tối đa (VND)."),
-            "min_price": types.Schema(type="NUMBER", description="Giá tối thiểu (VND)."),
-            "wine_type": types.Schema(type="STRING", description="Loại rượu (vd: 'Red', 'White', 'Sparkling')."),
+tools_schema = [
+    {
+        "type": "function",
+        "function": {
+            "name": "search_wines",
+            "description": "BƯỚC 1: Tìm kiếm sản phẩm để lấy ID. Luôn dùng tool này trước khi mua hàng nếu chưa biết ID.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "keyword": {"type": "string", "description": "Tên rượu hoặc đặc điểm."},
+                    "max_price": {"type": "number"},
+                },
+                "required": ["keyword"]
+            }
         }
-    )
-)
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_wine_detail",
+            "description": "Xem chi tiết một sản phẩm khi đã có ID.",
+            "parameters": {
+                "type": "object",
+                "properties": { "wine_id": {"type": "string"} },
+                "required": ["wine_id"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "add_to_cart",
+            "description": "BƯỚC 2: Thêm sản phẩm vào giỏ hàng. Bắt buộc phải có 'product_id' chính xác lấy từ kết quả search.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "product_id": {"type": "string", "description": "UUID của sản phẩm (Lấy từ kết quả search_wines)."},
+                    "quantity": {"type": "integer", "description": "Số lượng (mặc định 1)."}
+                },
+                "required": ["product_id"]
+            }
+        }
+    }
+]
 
-get_wine_detail_tool = types.FunctionDeclaration(
-    name="get_wine_detail",
-    description="Lấy thông tin chi tiết của một chai rượu cụ thể dựa trên ID.",
-    parameters=types.Schema(
-        type="OBJECT",
-        properties={
-            "wine_id": types.Schema(type="STRING", description="ID của sản phẩm."),
-        },
-        required=["wine_id"]
-    )
-)
-
-# Gom lại thành Tool Object
-my_tools = types.Tool(function_declarations=[search_wines_tool, get_wine_detail_tool])
-
-# System Instruction
 sys_instruct = """
-Bạn là trợ lý ảo TheWineShop.
-1. Khi khách hỏi tìm rượu, dùng tool `search_wines`.
-2. Khi khách hỏi chi tiết 1 chai (sau khi đã tìm thấy và có ID), dùng tool `get_wine_detail`.
-3. Trả lời ngắn gọn, format Markdown, luôn in đậm tên rượu và giá tiền.
-4. Nếu công cụ trả về không tìm thấy, hãy nói thật với khách.
+Bạn là trợ lý AI thông minh của TheWineShop.
+
+QUY TRÌNH MUA HÀNG (BẮT BUỘC TUÂN THỦ):
+Nếu khách hàng muốn mua sản phẩm (ví dụ: "Mua chai này", "Thêm vào giỏ"):
+1.  **Bước 1**: Nếu bạn CHƯA biết ID sản phẩm, hãy gọi `search_wines` để tìm theo tên/giá khách yêu cầu.
+2.  **Bước 2**: Đọc kết quả tìm kiếm. Nếu tìm thấy sản phẩm phù hợp, LẤY NGAY `id` của sản phẩm đó.
+3.  **Bước 3**: Gọi ngay tool `add_to_cart` với `product_id` vừa tìm được.
+4.  **Bước 4**: Thông báo kết quả cho khách.
+
+QUY TẮC KỸ THUẬT (CHỐNG LỖI):
+- Tuyệt đối KHÔNG trả về định dạng XML/DSML (ví dụ: <|DSML|...>).
+- Nếu cần gọi tool, chỉ sử dụng JSON Tool Call chuẩn.
+- Đừng hỏi lại khách "Tôi có nên thêm vào giỏ không?" nếu họ đã ra lệnh "Thêm vào giỏ". Hãy làm luôn.
 """
 
-# ---------------------------------------------------------
+# ----------------
 # 3. CONTROLLER
-# ---------------------------------------------------------
+# ----------------
 
 _current_db_session: SessionDep = None
-def _get_db_session_context():
-    return _current_db_session
+_current_user_context: Optional[UserResponse] = None
 
-async def generate_consulting_response(user_query: str, db: SessionDep):
-    global _current_db_session
-    _current_db_session = db 
+def _get_db_session_context(): return _current_db_session
+def _get_user_context(): return _current_user_context
 
-    if not client:
-        return "Chưa cấu hình AI Key."
+async def generate_consulting_response(
+    user_query: str, 
+    history: List[Dict[str, str]], 
+    db: SessionDep, 
+    user: Optional[UserResponse] = None
+):
+    global _current_db_session, _current_user_context
+    _current_db_session = db
+    _current_user_context = user
 
-    # Tạo Config với tool khai báo thủ công
-    config = types.GenerateContentConfig(
-        tools=[my_tools], 
-        system_instruction=sys_instruct,
-        temperature=0.7
-    )
+    if not client: return "Chưa cấu hình API Key."
 
-    chat = client.chats.create(
-        model='gemini-2.5-flash', 
-        config=config
-    )
+    messages = [{"role": "system", "content": sys_instruct}]
     
-    # 1. Gửi tin nhắn đầu tiên
-    try:
-        response = chat.send_message(user_query)
-    except Exception as e:
-        logger.error(f"Gemini API Error: {e}")
-        return "Xin lỗi, hệ thống AI đang bận. Vui lòng thử lại sau."
+    recent_history = history[-6:] if history else []
+    for msg in recent_history:
+        if msg.get("role") in ["user", "assistant"] and msg.get("content"):
+             messages.append({"role": msg["role"], "content": msg["content"]})
     
-    # 2. Vòng lặp xử lý Function Calling
-    max_turns = 3
-    current_turn = 0
+    messages.append({"role": "user", "content": user_query})
 
-    while response.function_calls and current_turn < max_turns:
-        parts_to_send_back = []
-        
-        for call in response.function_calls:
-            fn_name = call.name
-            fn_args = call.args
-            
-            logger.info(f"🤖 AI Calling: {fn_name} | Args: {fn_args}")
-            
-            api_result = None
-            
-            # Map tên hàm từ declaration sang hàm impl (async)
-            if fn_name == "search_wines":
-                api_result = await search_wines_impl(**fn_args)
-            elif fn_name == "get_wine_detail":
-                api_result = await get_wine_detail_impl(**fn_args)
-            else:
-                api_result = "Unknown function"
-            
-            # Đóng gói kết quả
-            parts_to_send_back.append(
-                types.Part.from_function_response(
-                    name=fn_name,
-                    response={"result": api_result}
-                )
+    for _ in range(5):
+        try:
+            response = await client.chat.completions.create(
+                model="deepseek-chat",
+                messages=messages,
+                tools=tools_schema,
+                tool_choice="auto",
+                temperature=0.1
             )
+        except Exception as e:
+            logger.error(f"API Error: {e}")
+            return "Hệ thống đang bận."
 
-        if parts_to_send_back:
-             response = chat.send_message(parts_to_send_back)
+        response_message = response.choices[0].message
         
-        current_turn += 1
+        if not response_message.tool_calls:
+            return response_message.content
+
+        messages.append(response_message)
         
-    return response.text
+        for tool_call in response_message.tool_calls:
+            fn_name = tool_call.function.name
+            try:
+                fn_args = json.loads(tool_call.function.arguments)
+            except:
+                logger.error("JSON Parse Error")
+                continue
+            
+            logger.info(f"AI Calling: {fn_name} | Args: {fn_args}")
+            
+            tool_result = "Unknown function"
+            if fn_name == "search_wines":
+                tool_result = await search_wines_impl(**fn_args)
+            elif fn_name == "get_wine_detail":
+                tool_result = await get_wine_detail_impl(**fn_args)
+            elif fn_name == "add_to_cart":
+                tool_result = await add_to_cart_impl(**fn_args)
+            
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tool_call.id,
+                "content": str(tool_result)
+            })
+
+    return "Đã thực hiện xong các thao tác."
