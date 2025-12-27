@@ -15,6 +15,9 @@ from src.user.router import user_route
 from src.product.router import product_router
 from src.order.router import cart_router
 from src.admin.router import admin_router
+from chatbot_router import chatbot_router  # 1. Import router
+
+app = FastAPI()
 
 THIS_DIR = Path(__file__).parent
 
@@ -56,3 +59,4 @@ app.include_router(user_route, prefix="/api")
 app.include_router(product_router, prefix="/api")
 app.include_router(cart_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
+app.include_router(chatbot_router, prefix="/api/chatbot", tags=["chatbot"])
