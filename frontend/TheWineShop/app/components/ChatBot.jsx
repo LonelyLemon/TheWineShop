@@ -31,7 +31,7 @@ const ChatBot = () => {
     try {
       const historyPayloads = messages.map(msg => ({
         role: msg.sender === 'ai' ? 'assistant' : 'user',
-        content: userMsg.text
+        content: msg.text
       }));
       
       const response = await axiosClient.post('/api/ai/chat', {
