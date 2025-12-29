@@ -37,7 +37,7 @@ async def websocket_endpoint(
         return
 
     user_id = str(user.id)
-    role = user.role
+    role = str(user.role).lower()
 
     await chat_manager.connect(websocket, user_id, role)
 
@@ -50,7 +50,7 @@ async def websocket_endpoint(
                 continue
             
             # TRƯỜNG HỢP 1: USER GỬI TIN
-            if role == "user":
+            if role == "customer":
                 new_msg = ChatMessage(
                     sender_id=user.id,
                     content=content,
@@ -62,7 +62,7 @@ async def websocket_endpoint(
                 
                 msg_payload = {
                     "type": "new_message",
-                    "sender_role": "user",
+                    "sender_role": "customer",
                     "sender_id": user_id,
                     "sender_name": user.last_name,
                     "message": content,
@@ -132,7 +132,7 @@ async def get_active_conversations(
     db: SessionDep, 
     current_user: User = Depends(get_current_user)
 ):
-    if current_user.role == "user":
+    if current_user.role == "customer":
         return []
 
     stmt = select(ChatMessage.sender_id).where(ChatMessage.message_type == "admin_chat").distinct()
