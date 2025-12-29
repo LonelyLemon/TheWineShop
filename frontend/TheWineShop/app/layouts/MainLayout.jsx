@@ -49,6 +49,7 @@ const MainLayout = () => {
                       <>
                         <Link to="/admin/promotions" className="admin-link">🎟️ Khuyến mãi (Promotions)</Link>
                         <Link to="/admin/users" className="admin-link">👥 Quản lý Người dùng</Link>
+                        <Link to="/admin/chat" className="admin-link">💬 Hỗ trợ khách hàng</Link>
                       </>
                     )}
                 </nav>

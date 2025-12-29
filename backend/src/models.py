@@ -15,3 +15,5 @@ from src.order.models import (
     Order, 
     OrderItem
 )
+
+from src.chat.models import ChatMessage

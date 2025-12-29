@@ -141,3 +141,62 @@
   margin-left: 10px;
   margin-bottom: 5px;
 }
+
+.chatbot-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.back-btn {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.2rem;
+    cursor: pointer;
+    margin-right: 10px;
+}
+
+.chat-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    padding: 20px;
+    text-align: center;
+}
+
+.menu-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 1rem;
+    font-weight: bold;
+    color: #333;
+}
+
+.menu-btn:hover {
+    background: #f5f5f5;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.menu-btn.ai-btn {
+    border-left: 5px solid #6f42c1;
+}
+
+.menu-btn.admin-btn {
+    border-left: 5px solid #28a745;
+}
+
+.sub-text {
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 5px;
+    font-weight: normal;
+}

@@ -9,7 +9,7 @@ from loguru import logger
 
 
 from src.core.config import settings
-from src.product.models import Wine, Category
+from src.product.models import Inventory, Wine, Category
 from src.order.models import Cart, CartItem
 from src.core.database import SessionDep
 from src.user.schemas import UserResponse
@@ -105,12 +105,25 @@ async def add_to_cart(product_id: str, quantity: int = 1):
     user = _get_user_context()
     logger.info(f"[TOOL] add_to_cart: id={product_id}, qty={quantity}")
     
-    if not user: return "LỖI: Khách hàng chưa đăng nhập. Yêu cầu đăng nhập."
+    if not user: 
+        return "LỖI: Khách hàng chưa đăng nhập. Yêu cầu đăng nhập."
     
     try:
         product = await db.get(Wine, product_id)
-        if not product: return "Lỗi: Không tìm thấy sản phẩm ID này."
-    
+        if not product: 
+            return "Lỗi: Không tìm thấy sản phẩm ID này."
+
+        stmt_inv = select(Inventory).where(Inventory.wine_id == product_id)
+        inventory = (await db.execute(stmt_inv)).scalar_one_or_none()
+        
+        current_stock = inventory.quantity_available if inventory else 0
+        
+        if current_stock == 0:
+            return f"Rất tiếc, sản phẩm '{product.name}' hiện đã hết hàng."
+        
+        if current_stock < quantity:
+            return f"Kho chỉ còn {current_stock} chai '{product.name}', không đủ số lượng {quantity} bạn yêu cầu."
+
         stmt = select(Cart).where(Cart.user_id == user.id)
         cart = (await db.execute(stmt)).scalar_one_or_none()
         if not cart:
@@ -122,6 +135,12 @@ async def add_to_cart(product_id: str, quantity: int = 1):
         stmt_item = select(CartItem).where(CartItem.cart_id == cart.id, CartItem.wine_id == product_id)
         cart_item = (await db.execute(stmt_item)).scalar_one_or_none()
         
+        current_qty_in_cart = cart_item.quantity if cart_item else 0
+        new_total_qty = current_qty_in_cart + quantity
+
+        if new_total_qty > current_stock:
+             return f"Bạn đã có {current_qty_in_cart} chai trong giỏ. Kho chỉ còn tổng cộng {current_stock} chai."
+
         if cart_item: 
             cart_item.quantity += quantity
         else:
