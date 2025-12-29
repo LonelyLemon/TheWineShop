@@ -59,7 +59,7 @@ const MainLayout = () => {
         <main style={{flex: 1, padding: '20px', background: '#f0f2f5'}}>
           <Outlet />
         </main>
-        <ChatBot />
+        {!isAdminOrStock && <ChatBot />}
       </div>
     </div>
   );

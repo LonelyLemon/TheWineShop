@@ -25,12 +25,16 @@ const ChatBot = () => {
   useEffect(scrollToBottom, [aiMessages, adminMessages, isOpen, mode]);
 
   useEffect(() => {
-    if (isOpen && mode === 'menu') {
+    if (isOpen) {
+      checkAdminStatus();
+    }
+  }, [isOpen]);
+
+  const checkAdminStatus = () => {
       axiosClient.get('/api/chat/status')
         .then(res => setAdminOnline(res.data.online))
         .catch(() => setAdminOnline(false));
-    }
-  }, [isOpen, mode]);
+  }
 
   const getWebSocketUrl = (token) => {
     const apiHost = import.meta.env.VITE_API_URL 
@@ -39,11 +43,20 @@ const ChatBot = () => {
     return `${apiHost}/api/chat/ws?token=${token}`;
   };
 
+  const switchToAdminChat = async () => {
+    const statusRes = await axiosClient.get('/api/chat/status');
+    if (!statusRes.data.online) {
+        alert("Hiện tại không có Admin nào đang trực tuyến. Vui lòng thử lại sau hoặc để lại lời nhắn.");
+        return;
+    }
+    setMode('admin');
+  };
+
   useEffect(() => {
     if (mode === 'admin') {
         axiosClient.get('/api/chat/history').then(res => {
             const history = res.data.map(m => ({
-                sender: m.sender === 'me' ? 'customer' : 'admin',
+                sender: m.sender,
                 text: m.message
             }));
             setAdminMessages(history);
@@ -69,7 +82,17 @@ const ChatBot = () => {
 
         ws.current.onmessage = (event) => {
             const data = JSON.parse(event.data);
-            setAdminMessages(prev => [...prev, { sender: 'admin', text: data.message }]);
+            
+            if (data.type === 'conversation_ended') {
+                alert(data.message);
+                setAdminMessages([]);
+                setMode('menu');
+                return;
+            }
+
+            if (data.sender_role === 'admin') {
+                 setAdminMessages(prev => [...prev, { sender: 'admin', text: data.message }]);
+            }
         };
 
         ws.current.onclose = () => {
@@ -95,7 +118,7 @@ const ChatBot = () => {
 
         try {
             const historyPayloads = aiMessages.map(msg => ({
-                role: msg.sender === 'ai' ? 'assistant' : 'customer',
+                role: msg.sender === 'ai' ? 'assistant' : 'user',
                 content: msg.text 
             }));
             
@@ -166,10 +189,10 @@ const ChatBot = () => {
                         🤖 Sử dụng Trợ lý ảo (AI)
                         <span className="sub-text">Tư vấn, tìm rượu, mua hàng tự động</span>
                     </button>
-                    <button className="menu-btn admin-btn" onClick={() => setMode('admin')}>
+                    <button className="menu-btn admin-btn" onClick={switchToAdminChat}>
                         👨‍💼 Chat với Admin
                         <span className="sub-text">
-                            {adminOnline ? '🟢 Đang trực tuyến' : '⚪ Hiện đang vắng mặt (Sẽ trả lời sau)'}
+                            {adminOnline ? '🟢 Đang trực tuyến' : '⚪ Hiện đang vắng mặt'}
                         </span>
                     </button>
                 </div>
