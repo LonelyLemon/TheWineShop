@@ -32,11 +32,18 @@ const ChatBot = () => {
     }
   }, [isOpen, mode]);
 
+  const getWebSocketUrl = (token) => {
+    const apiHost = import.meta.env.VITE_API_URL 
+        ? import.meta.env.VITE_API_URL.replace(/^http/, 'ws')
+        : 'ws://localhost:8000';
+    return `${apiHost}/api/chat/ws?token=${token}`;
+  };
+
   useEffect(() => {
     if (mode === 'admin') {
         axiosClient.get('/api/chat/history').then(res => {
             const history = res.data.map(m => ({
-                sender: m.sender === 'me' ? 'user' : 'admin',
+                sender: m.sender === 'me' ? 'customer' : 'admin',
                 text: m.message
             }));
             setAdminMessages(history);
@@ -48,10 +55,16 @@ const ChatBot = () => {
             return;
         }
 
-        ws.current = new WebSocket(`ws://localhost:8000/api/chat/ws?token=${token}`);
+        const wsUrl = getWebSocketUrl(token);
+        console.log("Connecting to WS:", wsUrl);
+        ws.current = new WebSocket(wsUrl);
 
         ws.current.onopen = () => {
-            console.log("Connected to Admin Chat");
+            console.log("Connected to Admin Chat System");
+        };
+
+        ws.current.onerror = (error) => {
+            console.error("WebSocket Error:", error);
         };
 
         ws.current.onmessage = (event) => {
@@ -75,14 +88,14 @@ const ChatBot = () => {
     if (!inputStr.trim()) return;
 
     if (mode === 'ai') {
-        const userMsg = { sender: 'user', text: inputStr };
+        const userMsg = { sender: 'customer', text: inputStr };
         setAiMessages(prev => [...prev, userMsg]);
         setInputStr('');
         setLoading(true);
 
         try {
             const historyPayloads = aiMessages.map(msg => ({
-                role: msg.sender === 'ai' ? 'assistant' : 'user',
+                role: msg.sender === 'ai' ? 'assistant' : 'customer',
                 content: msg.text 
             }));
             
@@ -102,7 +115,7 @@ const ChatBot = () => {
 
     } else if (mode === 'admin') {
         if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-            const userMsg = { sender: 'user', text: inputStr };
+            const userMsg = { sender: 'customer', text: inputStr };
             setAdminMessages(prev => [...prev, userMsg]);
             
             ws.current.send(JSON.stringify({ message: inputStr }));

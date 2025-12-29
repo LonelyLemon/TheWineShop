@@ -32,8 +32,13 @@ const AdminChatPage = () => {
   const connectWebSocket = () => {
     const token = localStorage.getItem('access_token');
     if (!token) return;
-
-    ws.current = new WebSocket(`ws://localhost:8000/api/chat/ws?token=${token}`);
+    const apiHost = import.meta.env.VITE_API_URL 
+        ? import.meta.env.VITE_API_URL.replace(/^http/, 'ws')
+        : 'ws://localhost:8000';
+    const wsUrl = `${apiHost}/api/chat/ws?token=${token}`;
+    
+    console.log("Admin connecting to WS:", wsUrl);
+    ws.current = new WebSocket(wsUrl);
 
     ws.current.onopen = () => {
       console.log("Admin Connected to Chat System");
@@ -42,12 +47,12 @@ const AdminChatPage = () => {
     ws.current.onmessage = (event) => {
       const data = JSON.parse(event.data);
       
-      if (data.type === 'new_message' && data.sender_role === 'user') {
+      if (data.type === 'new_message' && data.sender_role === 'customer') {
         const senderId = data.sender_id;
         
         setMessages(prev => ({
           ...prev,
-          [senderId]: [...(prev[senderId] || []), { sender: 'user', text: data.message }]
+          [senderId]: [...(prev[senderId] || []), { sender: 'customer', text: data.message }]
         }));
 
         setConversations(prev => {
