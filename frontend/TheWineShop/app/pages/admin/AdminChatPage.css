@@ -31,6 +31,10 @@
     overflow-y: auto;
 }
 
+.empty-text {
+    color: #000000;
+}
+
 .user-item {
     display: flex;
     align-items: center;
