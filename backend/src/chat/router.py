@@ -158,7 +158,7 @@ async def get_chat_history(
     return [
         {
             "id": str(msg.id),
-            "sender": "customer" if msg.sender_id == query_user_id else "admin",
+            "sender": "customer" if str(msg.sender_id) == str(query_user_id) else "admin",
             "message": msg.content,
             "created_at": msg.created_at
         } for msg in messages
