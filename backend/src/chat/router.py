@@ -1,10 +1,10 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, Query
 from sqlalchemy.future import select
-from sqlalchemy import or_, and_
-from typing import List
+from sqlalchemy import or_, and_, delete
+from typing import List, Optional
 
 from src.core.database import SessionDep
-from src.auth.dependencies import get_current_user
+from src.auth.dependencies import get_current_user, allow_staff
 from src.auth.security import decode_token
 from src.chat.models import ChatMessage
 from src.chat.manager import chat_manager
@@ -102,10 +102,54 @@ async def websocket_endpoint(
     except WebSocketDisconnect:
         chat_manager.disconnect(user_id, role)
 
+
+@chat_router.delete("/conversation/{user_id}")
+async def end_conversation(
+    user_id: str, 
+    db: SessionDep, 
+    current_user: User = Depends(allow_staff)
+):
+    stmt = delete(ChatMessage).where(
+        and_(
+            ChatMessage.message_type == "admin_chat",
+            or_(
+                ChatMessage.sender_id == user_id,
+                ChatMessage.receiver_id == user_id
+            )
+        )
+    )
+    await db.execute(stmt)
+    await db.commit()
+    
+    await chat_manager.send_personal_message(
+        {"type": "conversation_ended", "message": "Admin đã kết thúc đoạn hội thoại."},
+        str(user_id)
+    )
+    
+    return {"message": "Đã xóa lịch sử hội thoại thành công"}
+
+
 @chat_router.get("/history")
-async def get_chat_history(db: SessionDep, current_user: User = Depends(get_current_user)):
+async def get_chat_history(
+    db: SessionDep, 
+    current_user: User = Depends(get_current_user),
+    target_user_id: Optional[str] = Query(None)
+):
+    if current_user.role == "customer":
+        query_user_id = current_user.id
+    else:
+        if not target_user_id:
+            return []
+        query_user_id = target_user_id
+
     stmt = select(ChatMessage).where(
-        or_(ChatMessage.sender_id == current_user.id, ChatMessage.receiver_id == current_user.id)
+        and_(
+            ChatMessage.message_type == "admin_chat",
+            or_(
+                ChatMessage.sender_id == query_user_id,
+                ChatMessage.receiver_id == query_user_id
+            )
+        )
     ).order_by(ChatMessage.created_at.asc())
     
     result = await db.execute(stmt)
@@ -114,7 +158,7 @@ async def get_chat_history(db: SessionDep, current_user: User = Depends(get_curr
     return [
         {
             "id": str(msg.id),
-            "sender": "me" if msg.sender_id == current_user.id else "admin",
+            "sender": "customer" if str(msg.sender_id) == str(query_user_id) else "admin",
             "message": msg.content,
             "created_at": msg.created_at
         } for msg in messages
@@ -141,7 +185,12 @@ async def get_active_conversations(
     
     if not user_ids: return []
     
-    users_stmt = select(User).where(User.id.in_(user_ids))
+    users_stmt = select(User).where(
+        and_(
+            User.id.in_(user_ids),
+            User.role == "customer" 
+        )
+    )
     users = (await db.execute(users_stmt)).scalars().all()
     
     return [

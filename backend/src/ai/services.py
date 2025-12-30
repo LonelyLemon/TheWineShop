@@ -202,10 +202,10 @@ async def generate_consulting_response(
     
     recent_history = history[-6:] if history else []
     for msg in recent_history:
-        if msg.get("role") in ["customer", "assistant"] and msg.get("content"):
+        if msg.get("role") in ["user", "assistant"] and msg.get("content"):
              messages.append({"role": msg["role"], "content": msg["content"]})
     
-    messages.append({"role": "customer", "content": user_query})
+    messages.append({"role": "user", "content": user_query})
 
     try:
         for _ in range(5):

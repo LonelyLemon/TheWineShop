@@ -13,10 +13,10 @@ const AdminChatPage = () => {
 
   useEffect(() => {
     fetchConversations();
-    connectWebSocket();
+    const cleanupWs = connectWebSocket();
 
     return () => {
-      if (ws.current) ws.current.close();
+      if (cleanupWs) cleanupWs();
     };
   }, []);
 
@@ -29,6 +29,50 @@ const AdminChatPage = () => {
     }
   };
 
+  const fetchUserHistory = async (userId) => {
+    try {
+        const res = await axiosClient.get(`/api/chat/history?target_user_id=${userId}`);
+        const history = res.data.map(m => ({
+            sender: m.sender === 'admin' ? 'me' : 'customer',
+            text: m.message
+        }));
+        
+        setMessages(prev => ({
+            ...prev,
+            [userId]: history
+        }));
+    } catch (err) {
+        console.error("Lỗi lấy lịch sử:", err);
+    }
+  };
+
+  const handleSelectUser = (user) => {
+      setSelectedUser(user);
+      fetchUserHistory(user.id);
+  };
+
+  const handleEndConversation = async () => {
+      if (!selectedUser) return;
+      if (!window.confirm(`Bạn có chắc muốn kết thúc và xóa đoạn chat với ${selectedUser.full_name}?`)) return;
+
+      try {
+          await axiosClient.delete(`/api/chat/conversation/${selectedUser.id}`);
+          
+          setConversations(prev => prev.filter(u => u.id !== selectedUser.id));
+          setMessages(prev => {
+              const newState = {...prev};
+              delete newState[selectedUser.id];
+              return newState;
+          });
+          setSelectedUser(null);
+          alert("Đã kết thúc hội thoại.");
+
+      } catch (err) {
+          alert("Lỗi khi kết thúc hội thoại");
+          console.log(err)
+      }
+  };
+
   const connectWebSocket = () => {
     const token = localStorage.getItem('access_token');
     if (!token) return;
@@ -38,7 +82,8 @@ const AdminChatPage = () => {
     const wsUrl = `${apiHost}/api/chat/ws?token=${token}`;
     
     console.log("Admin connecting to WS:", wsUrl);
-    ws.current = new WebSocket(wsUrl);
+    const socket = new WebSocket(wsUrl);
+    ws.current = socket;
 
     ws.current.onopen = () => {
       console.log("Admin Connected to Chat System");
@@ -63,6 +108,12 @@ const AdminChatPage = () => {
             return prev;
         });
       }
+    };
+
+    return () => {
+        if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+            socket.close();
+        }
     };
   };
 
@@ -102,7 +153,7 @@ const AdminChatPage = () => {
                 <div 
                     key={user.id} 
                     className={`user-item ${selectedUser?.id === user.id ? 'active' : ''}`}
-                    onClick={() => setSelectedUser(user)}
+                    onClick={() => handleSelectUser(user)}
                 >
                     <div className="avatar">{user.full_name.charAt(0)}</div>
                     <div className="info">
@@ -121,8 +172,14 @@ const AdminChatPage = () => {
             </div>
         ) : (
             <>
-                <div className="chat-header-bar">
-                    Chat với: <strong>{selectedUser.full_name}</strong>
+                <div className="chat-header-bar" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                    <span>Chat với: <strong>{selectedUser.full_name}</strong></span>
+                    <button 
+                        onClick={handleEndConversation}
+                        style={{background: '#ff4d4f', color: 'white', padding: '5px 10px', fontSize: '12px'}}
+                    >
+                        Kết thúc hội thoại
+                    </button>
                 </div>
                 
                 <div className="chat-messages-area">
