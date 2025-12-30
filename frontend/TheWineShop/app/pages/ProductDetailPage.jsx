@@ -25,9 +25,8 @@ const ProductDetailPage = () => {
         try {
             const res = await axiosClient.get('/api/users/me');
             setCurrentUser(res.data);
-        // eslint-disable-next-line no-unused-vars
         } catch (e) { 
-          /* Chưa login */ 
+          console.log(e);
         }
     };
     fetchUser();
@@ -92,8 +91,7 @@ const ProductDetailPage = () => {
                 <h1 className="detail-title">{wine.name}</h1>
                 
                 <div className="detail-meta">
-                    <span className="meta-item">Nhà sản xuất: <strong>{wine.winery?.name}</strong></span>
-                    <span className="meta-item">Vùng: <strong>{wine.winery?.region?.name}</strong></span>
+                    <span className="meta-item">Thương hiệu: <strong>{wine.winery?.name}</strong></span>
                 </div>
 
                 <div className="detail-price">{formatPrice(wine.price)}</div>
@@ -101,6 +99,20 @@ const ProductDetailPage = () => {
                 <p className="detail-description">{wine.description}</p>
 
                 <div className="specs-grid">
+                    <div className="spec-item">
+                        <span className="spec-label">Loại vang</span>
+                        <span className="spec-value">{wine.category?.name}</span>
+                    </div>
+                    <div className="spec-item">
+                        <span className="spec-label">Xuất xứ</span>
+                        <span className="spec-value">{wine.winery?.region?.name}</span>
+                    </div>
+                     <div className="spec-item">
+                        <span className="spec-label">Giống nho</span>
+                        <span className="spec-value">
+                            {wine.grapes?.map(g => g.grape_variety.name).join(', ') || 'N/A'}
+                        </span>
+                    </div>
                     <div className="spec-item">
                         <span className="spec-label">Độ cồn</span>
                         <span className="spec-value">{wine.alcohol_percentage}%</span>
@@ -112,12 +124,6 @@ const ProductDetailPage = () => {
                     <div className="spec-item">
                         <span className="spec-label">Niên vụ</span>
                         <span className="spec-value">{wine.vintage}</span>
-                    </div>
-                    <div className="spec-item">
-                        <span className="spec-label">Giống nho</span>
-                        <span className="spec-value">
-                            {wine.grapes?.map(g => g.grape_variety.name).join(', ') || 'N/A'}
-                        </span>
                     </div>
                 </div>
 
