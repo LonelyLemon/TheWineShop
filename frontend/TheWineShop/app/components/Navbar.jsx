@@ -1,100 +1,101 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import axiosClient from '../api/axiosClient';
-import { toast } from 'react-toastify';
 import { useCart } from '../context/CartContext';
+import axiosClient from '../api/axiosClient';
 import SearchBar from './SearchBar';
 import './Navbar.css';
 
 const Navbar = () => {
+  const { cartTotal } = useCart();
   const navigate = useNavigate();
+  const [categories, setCategories] = useState([]);
+  const [isScrolled, setIsScrolled] = useState(false);
   const [user, setUser] = useState(null);
-  const { cartCount, refreshCart } = useCart();
-  const [showDropdown, setShowDropdown] = useState(false);
 
   useEffect(() => {
-    const fetchUser = async () => {
-      const token = localStorage.getItem('access_token');
-      if (token) {
-        try {
-          const response = await axiosClient.get('/api/users/me');
-          setUser(response.data);
-          refreshCart();
-        // eslint-disable-next-line no-unused-vars
-        } catch (error) {
-            localStorage.removeItem('access_token');
-            localStorage.removeItem('refresh_token');
-        }
-      }
+    const fetchCats = async () => {
+      try {
+        const res = await axiosClient.get('/api/products/categories');
+        setCategories(res.data);
+      } catch (e) { console.error(e); }
     };
-    fetchUser();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    fetchCats();
+
+    const token = localStorage.getItem('access_token');
+    if (token) {
+        axiosClient.get('/api/users/me')
+            .then(res => setUser(res.data))
+            .catch(() => setUser(null));
+    }
+
+    const handleScroll = () => setIsScrolled(window.scrollY > 50);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    setUser(null);
-    refreshCart();
-    toast.info("Đã đăng xuất");
-    navigate('/login');
+      localStorage.removeItem('access_token');
+      setUser(null);
+      navigate('/login');
+      window.location.reload();
   };
 
-return (
-    <nav className="navbar">
+  return (
+    <nav className={`navbar ${isScrolled ? 'scrolled' : ''}`}>
       <div className="navbar-container">
-        <Link to="/" className="navbar-logo">TheWineShop 🍷</Link>
+        <Link to="/" className="navbar-logo">
+          THE WINE SHOP
+        </Link>
 
         <ul className="nav-menu">
-          <li className="nav-item"><Link to="/" className="nav-links">Trang chủ</Link></li>
-          <li className="nav-item"><Link to="/" className="nav-links">Sản phẩm</Link></li>
+          <li className="nav-item">
+            <Link to="/" className="nav-links">Trang Chủ</Link>
+          </li>
+          
+          <li className="nav-item dropdown">
+            <Link to="/products" className="nav-links">
+              Sản Phẩm <i className="fas fa-caret-down"></i>
+            </Link>
+            <div className="dropdown-content">
+                <Link to="/products">Tất cả sản phẩm</Link>
+                {categories.map(cat => (
+                    <Link key={cat.id} to={`/products?category=${cat.id}`}>
+                        {cat.name}
+                    </Link>
+                ))}
+            </div>
+          </li>
+
+          <li className="nav-item">
+            <Link to="/blog" className="nav-links">Kiến Thức</Link>
+          </li>
+          <li className="nav-item">
+            <Link to="/about" className="nav-links">Về Chúng Tôi</Link>
+          </li>
         </ul>
         <SearchBar />
-        <div className="nav-actions">
-           <Link to="/cart" className="cart-icon">
-              🛒 <span className="cart-count">{cartCount}</span>
-           </Link>
+        <div className="nav-icons">
 
-           {user ? (
-             <div className="user-menu" style={{position: 'relative'}}>
-               <span 
-                 className="user-name" 
-                 onClick={() => setShowDropdown(!showDropdown)}
-                 style={{cursor: 'pointer'}}
-               >
-                 Hi, {user.last_name} ▼
-               </span>
-               
-               {showDropdown && (
-                 <div className="dropdown-menu">
-                    <Link to="/orders" className="dropdown-item" onClick={() => setShowDropdown(false)}>Lịch sử đơn hàng</Link>
-                    
-                    <Link to="/profile" className="dropdown-item" onClick={() => setShowDropdown(false)}>Hồ sơ cá nhân</Link>
-                    
-                    {(user.role === 'admin' || user.role === 'stock_manager') && (
-                        <>
-                            <Link to="/admin/products" className="dropdown-item" onClick={() => setShowDropdown(false)}>Quản lý Sản phẩm</Link>
-                        </>
-                    )}
-                    
-                    {user.role === 'admin' && (
-                        <>
-                          <Link to="/admin/orders" className="dropdown-item" onClick={() => setShowDropdown(false)}>Quản lý Đơn hàng</Link>
-                          <Link to="/admin/users" className="dropdown-item" onClick={() => setShowDropdown(false)}>Quản lý Người dùng</Link>
-                        </>
-                    )}
-                    
-                    <div className="divider"></div>
-                    <button onClick={handleLogout} className="dropdown-item logout">Đăng xuất</button>
-                 </div>
-               )}
-             </div>
-           ) : (
-             <div className="auth-buttons">
-               <Link to="/login" className="nav-btn-login">Đăng nhập</Link>
-               <Link to="/register" className="nav-btn-register">Đăng ký</Link>
-             </div>
-           )}
+            <Link to="/cart" className="icon-item cart-icon">
+                🛒
+                {cartTotal > 0 && <span className="cart-badge">{cartTotal}</span>}
+            </Link>
+
+            <div className="icon-item user-action">
+                {user ? (
+                    <div className="user-dropdown">
+                        <span className="user-name">Chào, {user.first_name || 'Bạn'} ▼</span>
+                        <div className="user-menu">
+                            <Link to="/profile">Hồ sơ</Link>
+                            <Link to="/orders">Đơn hàng</Link>
+                            {(user.role === 'admin' || user.role === 'stock_manager') && <Link to="/admin">Quản trị</Link>}
+                            <button onClick={handleLogout}>Đăng xuất</button>
+                        </div>
+                    </div>
+                ) : (
+                    <Link to="/login" className="login-btn">Đăng nhập</Link>
+                )}
+            </div>
         </div>
       </div>
     </nav>

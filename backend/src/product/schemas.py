@@ -14,6 +14,23 @@ class CategoryBase(BaseModel):
     class Config:
         from_attributes = True
 
+class CategoryCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+
+class RegionCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    map_image_url: Optional[str] = None
+
+class GrapeVarietyCreate(BaseModel):
+    name: str
+
+class WineryCreate(BaseModel):
+    name: str
+    phone_number: Optional[str] = None
+    region_id: Optional[UUID] = None
+
 class RegionBase(BaseModel):
     id: UUID
     name: str

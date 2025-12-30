@@ -12,7 +12,7 @@ from src.user.models import User
 from src.core.database import SessionDep
 from src.product.models import (
     Wine, 
-    Category, 
+    Category,
     WineImage, 
     Inventory, 
     Region, 
@@ -26,7 +26,11 @@ from src.product.schemas import (
     WineListResponse, 
     WineDetailResponse, 
     CategoryBase, 
-    WineCreate, 
+    CategoryCreate,
+    RegionCreate,
+    GrapeVarietyCreate,
+    WineryCreate,
+    WineCreate,
     WineUpdate,
     RegionBase,
     WineryBase,
@@ -53,14 +57,35 @@ async def get_categories(db: SessionDep):
     result = await db.execute(select(Category))
     return result.scalars().all()
 
+@product_router.post("/categories", response_model=CategoryBase)
+async def create_category(payload: CategoryCreate, db: SessionDep, user: User = Depends(allow_staff)):
+    slug = slugify(payload.name)
+    existing = await db.execute(select(Category).where(Category.slug == slug))
+    if existing.scalar_one_or_none():
+         raise HTTPException(status_code=400, detail="Loại vang này đã tồn tại")
+
+    new_category = Category(
+        name=payload.name,
+        slug=slug,
+        description=payload.description
+    )
+    db.add(new_category)
+    await db.commit()
+    await db.refresh(new_category)
+    return new_category
+
 @product_router.get("/regions", response_model=List[RegionBase])
 async def get_regions(db: SessionDep):
     result = await db.execute(select(Region))
     return result.scalars().all()
 
 @product_router.post("/regions", response_model=RegionBase)
-async def create_region(payload: RegionBase, db: SessionDep, user: User = Depends(allow_staff)):
-    new_region = Region(name=payload.name, description=payload.description, map_image_url=payload.map_image_url)
+async def create_region(payload: RegionCreate, db: SessionDep, user: User = Depends(allow_staff)):
+    new_region = Region(
+        name=payload.name, 
+        description=payload.description, 
+        map_image_url=payload.map_image_url
+    )
     db.add(new_region)
     await db.commit()
     await db.refresh(new_region)
@@ -75,21 +100,17 @@ async def get_wineries(db: SessionDep, region_id: Optional[UUID] = None):
     return result.scalars().all()
 
 @product_router.post("/wineries", response_model=WineryBase)
-async def create_winery(payload: WineryBase, db: SessionDep, user: User = Depends(allow_staff)):
+async def create_winery(payload: WineryCreate, db: SessionDep, user: User = Depends(allow_staff)):
     new_winery = Winery(
         name=payload.name, 
         phone_number=payload.phone_number,
-        region_id=payload.region.id if payload.region else None
+        region_id=payload.region_id
     )
-    
-    if payload.region and payload.region.id:
-         new_winery.region_id = payload.region.id
     
     db.add(new_winery)
     await db.commit()
     await db.refresh(new_winery)
     
-    # Reload relationship
     query = select(Winery).options(selectinload(Winery.region)).where(Winery.id == new_winery.id)
     result = await db.execute(query)
     return result.scalar_one()
@@ -100,13 +121,16 @@ async def get_grapes(db: SessionDep):
     return result.scalars().all()
 
 @product_router.post("/grapes", response_model=GrapeVarietyBase)
-async def create_grape(name: str, db: SessionDep, user: User = Depends(allow_staff)):
-    # Quick create grape
-    existing = await db.execute(select(GrapeVariety).where(GrapeVariety.name == name))
+async def create_grape(
+    payload: GrapeVarietyCreate, 
+    db: SessionDep, 
+    user: User = Depends(allow_staff)
+):
+    existing = await db.execute(select(GrapeVariety).where(GrapeVariety.name == payload.name))
     if existing.scalar_one_or_none():
          raise HTTPException(status_code=400, detail="Giống nho đã tồn tại")
     
-    new_grape = GrapeVariety(name=name)
+    new_grape = GrapeVariety(name=payload.name)
     db.add(new_grape)
     await db.commit()
     await db.refresh(new_grape)
