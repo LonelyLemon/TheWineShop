@@ -1,13 +1,6 @@
 # Use a Python image with uv pre-installed
 FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
 
-# Install Node.js + npm + npx
-RUN apt-get update && apt-get install -y curl ca-certificates gnupg \
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs \
-    && npm install -g npm@latest \
-    && rm -rf /var/lib/apt/lists/*
-
 # Install the project into `/app`
 WORKDIR /app
 
@@ -29,13 +22,10 @@ ADD . /app
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
 
+ENV ALEMBIC_CONFIG=/app/alembic.ini
 # Place executables in the environment at the front of the path
-ENV PATH="/app/.venv/bin:$PATH"
-
-# Reset the entrypoint, don't invoke `uv`
-ENTRYPOINT []
-
+EXPOSE 8000
 # Run the FastAPI application by default
 # Uses `fastapi dev` to enable hot-reloading when the `watch` sync occurs
 # Uses `--host 0.0.0.0` to allow access from outside the container
-CMD ["fastapi", "run", "--host", "0.0.0.0", "src/main.py"]
+CMD ["sh", "-lc", "uv run alembic upgrade head && uv run uvicorn src.main:app --host 0.0.0.0 --port 8000"]
