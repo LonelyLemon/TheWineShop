@@ -20,11 +20,17 @@ from src.media.router import media_router
 from src.ai.router import ai_router
 from src.chat.router import chat_router
 
+from src.seed_data import seed_products, seed_admin_user
+
 THIS_DIR = Path(__file__).parent
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Application startup")
+    try:
+        await seed_admin_user()
+    except Exception as e:
+        logger.error(f"Error seeding data: {e}")
     yield
 
 app = FastAPI(

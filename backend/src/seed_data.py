@@ -1,8 +1,12 @@
-# src/seed_data.py
 import asyncio
 from sqlalchemy import select
+
 from src.core.database import SessionLocal
 from src.product.models import Category, Wine, Inventory, Region, Winery, GrapeVariety, WineGrape
+from src.user.models import User
+from src.user.constants import UserRole, UserStatus
+from src.core.security import hash_password
+from src.core.config import settings
 
 async def seed_products():
     async with SessionLocal() as db:
@@ -96,5 +100,36 @@ async def seed_products():
 
         print("Seeding Complete!")
 
+async def seed_admin_user():
+    async with SessionLocal() as db:
+        print("Checking Admin User...")
+        
+        admin_email = "admin@thewineshop.com"
+        admin_password = "AdminPassword123!" 
+        
+        existing_admin = await db.execute(select(User).where(User.email == admin_email))
+        if existing_admin.scalar():
+            print(f"Admin user {admin_email} already exists.")
+            return
+
+        print(f"Creating default admin user: {admin_email}")
+        
+        new_admin = User(
+            email=admin_email,
+            hashed_password=hash_password(admin_password),
+            first_name="Super",
+            last_name="Admin",
+            role=UserRole.ADMIN.value,
+            status=UserStatus.ACTIVE.value,
+            email_verified=True,
+            phone_number="0909000111",
+            address_line_1="Headquarters"
+        )
+        
+        db.add(new_admin)
+        await db.commit()
+        print("Admin user created successfully!")
+
 if __name__ == "__main__":
     asyncio.run(seed_products())
+    asyncio.run(seed_admin_user())
